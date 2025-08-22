@@ -1,4 +1,4 @@
-use poem::{delete, get, handler, post, web::Json, Route};
+use poem::{get, handler, post, web::Json, Route};
 
 use crate::types::{CreateOrder, DeleteOrder};
 
@@ -31,7 +31,6 @@ async fn open() -> Json<String> {
 
 pub fn order_routes() -> Route {
     Route::new()
-        .at("/", post(create_order))
-        .at("/", delete(delete_order))
+        .at("/", post(create_order).delete(delete_order))
         .at("/sol_usd", get(open))
 }

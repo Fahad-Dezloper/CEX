@@ -1,11 +1,24 @@
-use poem::{get, handler, web::{Json, Query}, Route};
+use poem::{get, handler, web::{Data, Json, Query}, Route};
+use std::sync::Arc;
 
-use crate::types::DepthQuery;
+use crate::{redismanager::RedisManager, types::{DepthQuery, MessageToEngine, SymbolData}};
 
 #[handler]
-async fn depth_order(Query(query): Query<DepthQuery>) -> Json<String> {
-    Json("yoo".to_string())
-    // redis manager
+async fn depth_order(
+    Data(manager): Data<&Arc<RedisManager>>,
+    Query(query): Query<DepthQuery>,
+) -> poem::Result<Json<String>> {
+    let response = manager
+        .send_and_await(MessageToEngine {
+            type_: "GET_DEPTH".to_string(),
+            data: SymbolData {
+                market: query.symbol.clone().to_string(),
+            },
+        })
+        .await
+        .map_err(poem::error::InternalServerError)?;
+    println!("all good");
+    Ok(Json(response))
 }
 
 

@@ -1,11 +1,13 @@
 [package]
 name = "api"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 poem = "3.1.12"
+redis = { version = "0.32.5", features = ["tokio-comp"] }
 serde = "1.0.219"
 serde_json = "1.0.142"
-tokio = {version ="1.47.1",  features = ["rt-multi-thread", "macros"]}
+tokio = {version ="1.47.1",  features = ["full"]}
 uuid = { version = "1.x", features = ["v4"] }
+futures-util = "0.3"

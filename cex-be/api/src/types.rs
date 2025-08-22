@@ -29,3 +29,16 @@ pub struct DeleteOrder {
 pub struct DepthQuery {
     pub symbol: String
 }
+
+
+#[derive(Serialize, Deserialize)]
+pub struct SymbolData {
+    pub market: String
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MessageToEngine {
+    #[serde(rename = "type")]
+    pub type_ : String,
+    pub data: SymbolData
+}
