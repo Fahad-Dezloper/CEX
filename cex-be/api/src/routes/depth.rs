@@ -1,7 +1,7 @@
 use poem::{get, handler, web::{Data, Json, Query}, Route};
 use std::sync::Arc;
 
-use crate::{redismanager::RedisManager, types::{DepthQuery, MessageToEngine, SymbolData}};
+use crate::{redismanager::RedisManager, types::{DepthQuery, EngineData, MessageToEngine, SymbolData}};
 
 #[handler]
 async fn depth_order(
@@ -11,9 +11,9 @@ async fn depth_order(
     let response = manager
         .send_and_await(MessageToEngine {
             type_: "GET_DEPTH".to_string(),
-            data: SymbolData {
+            data: EngineData::Symbol(SymbolData {
                 market: query.symbol.clone().to_string(),
-            },
+            }),
         })
         .await
         .map_err(poem::error::InternalServerError)?;
