@@ -40,6 +40,11 @@ pub struct DeleteOrderData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct GetDepth {
+    pub market: String
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetOpenOrder {
     pub user_id: String,
     pub market: String
@@ -51,7 +56,8 @@ pub enum EngineData {
     Symbol(SymbolData),
     Order(CreateOrderData),
     DeleteOrder(DeleteOrderData),
-    OpenOrder(GetOpenOrder)
+    OpenOrder(GetOpenOrder),
+    Depth(GetDepth)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

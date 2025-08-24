@@ -1,10 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
-
+use std::{collections::HashMap};
 use log::info;
-use poem::web::Data;
 use serde::{Deserialize, Serialize};
 
-use crate::{orderbook::{Fill, Orderbook}, redis::redis_manager::RedisManager, types::{CreateOrderData, EngineData, MessageType, Process, Side, UserBalance}};
+use crate::{orderbook::{Fill, Orderbook}, redis::redis_manager::RedisManager, types::{CreateOrderData, DeleteOrderData, EngineData, GetDepth, GetOpenOrder, MessageType, Process, UserBalance}};
 
 pub const BASE_CURRENCY: &str = "INR";
 
@@ -29,7 +27,7 @@ impl Engine {
         engine
     }
 
-    pub fn process(&self, msg: Process) {
+    pub fn process(&mut self, msg: Process) {
         println!("Processing message: {:?} {:?}", msg.client_id, msg.message);
         
         match msg.type_ {
@@ -47,56 +45,149 @@ impl Engine {
     }
 
     // create order and other function will go to orderbook.rs
-    fn handle_create_order(&self, data: EngineData) {
+    fn handle_create_order(&mut self, data: EngineData) {
         println!("CREATE Order");
-        if let EngineData::Order(order_data) = data {
-            println!("Creating order: at price {} {}", order_data.price, order_data.market);
-            // Your create order logic here
-            let order = create_order(order_data.market, order_data.price, order_data.quantity, order_data.side, order_data.user_id);
-
-        } else {
-            println!("Invalid data for CreateOrder");
+        match data {
+            EngineData::Order(order_data) => {
+                println!("Creating order: at price {} {}", order_data.price, order_data.market);
+                match self.create_order(&order_data) {
+                    Ok((executed_qty, fills, order_id)) => {
+                        // Here you would send a success message to the API
+                        // RedisManager::get_instance().lock().unwrap().send_to_api(
+                        //     &order_data.user_id,
+                        //     MessageToApi::OrderPlaced {
+                        //         order_id,
+                        //         executed_qty,
+                        //         fills
+                        //     }
+                        // ).unwrap();
+                        println!("Order created successfully: {}, qty: {}, fills: {:?}", order_id, executed_qty, fills);
+                    }
+                    Err(e) => {
+                        // Here you would send an error message to the API
+                        // RedisManager::get_instance().lock().unwrap().send_to_api(
+                        //     &order_data.user_id,
+                        //     MessageToApi::OrderError {
+                        //         error: e.clone()
+                        //     }
+                        // ).unwrap();
+                        println!("Failed to create order: {}", e);
+                    }
+                }
+            }
+            _ => {
+                println!("Invalid data for CreateOrder");
+            }
         }
     }
 
     fn handle_cancel_order(&self, data: EngineData) {
         println!("CANCEL Order");
-        if let EngineData::DeleteOrder(cancel_data) = data {
-            println!("Cancelling order: {} in market {}", 
-                cancel_data.order_id, cancel_data.market);
-            // Your cancel order logic here
+        match data {
+            EngineData::DeleteOrder(delete_order_data) => {
+                println!("Cancel Order: of price {} {}", delete_order_data.market, delete_order_data.order_id);
+                match self.cancel_order(&delete_order_data){
+                    Ok((order_id, executed_qty, remain_qty)) => {
+                        // Here you would send a success message to the API
+                        // RedisManager::get_instance().lock().unwrap().send_to_api(
+                        //      &delete_order_data.order_id,
+                        // MessageToApi::OrderCancelled {
+                        //     order_id,
+                        //     executed_qty,
+                        //     remain_qty
+                        // } 
+                        // ).unwrap()
+                        println!("Order Cancelled Successfully: {}", orderDeleted)
+                    }
+                    Err(e) => {
+                        println!("Failed to Cancel Order: {}", e);
+                    }
+                }
+            }
+            _=> {
+                println!("Invalid data for delete order")
+            }
         }
     }
 
     fn handle_get_open_orders(&self, data: EngineData) {
         println!("GET_OPEN_ORDERS");
-        if let EngineData::OpenOrder(open_order_data) = data {
-            println!("Getting open orders for user: {} in market {}", 
-                open_order_data.user_id, open_order_data.market);
-            // Your get open orders logic here
+        match data {
+            EngineData::OpenOrder(open_order_data) => {
+                println!("Getting Open Orders");
+                match self.open_order(&open_order_data) {
+                    Ok(()) => {
+                        println!("Order Opened successfully")
+                    }
+                    Err(e) => {
+                        println!("Failed to fetch Open Orders")
+                    }
+                }
+            }
+            _ => {
+                println!("Invalid data for open orders")
+            }
         }
     }
 
     fn handle_on_ramp(&self, data: EngineData) {
-        println!("ON_RAMP");
         // Your on-ramp logic here
+
+        // add type in types.rs file follow the same structure
+
+        // println!("ON_RAMP");
+        // match data {
+        //     Engin
+        // }
     }
 
     fn handle_get_depth(&self, data: EngineData) {
         println!("GET_DEPTH");
-        if let EngineData::Symbol(symbol_data) = data {
-            println!("Getting depth for market: {}", symbol_data.market);
-            // Your get depth logic here
+        match data {
+            EngineData::Depth(market_data) => {
+                println!("Market data is here: {:?}", market_data.market);
+                match self.get_depth(&market_data) {
+                    Ok((bids, asks)) => {
+                        println!("Returning bids and asks: bids = {:?}, asks = {:?}", bids, asks);
+                        // TODO: Call function to send depth via redisManager
+                    }
+                    Err(e) => {
+                        println!("Failed to get Depth")
+                    }
+                }
+            }
+            _=> {
+                println!("Invalid market data recieved")
+            }
         }
-    }
+        }
+
+
+
+
+
 
 
 
     // real logic functions
     pub fn create_order(
         &mut self,
-        msg: CreateOrderData
-    ) -> Result<(f64, Vec<Fill>, String)> {
-        info!("Creating order for market: {:?}", msg.market)
+        msg: &CreateOrderData
+    ) -> Result<(f64, Vec<Fill>, String), String> {
+        info!("Creating order for market: {:?}", msg.market);
+        // Placeholder logic: return dummy values for now
+        Ok((0.0, Vec::new(), String::from("order_id_placeholder")))
+    }
+
+    pub fn cancel_order(&mut self, msg: &DeleteOrderData) -> Result<()> {
+        info!("Alot of logic needs to happen here");
+    }
+
+    pub fn open_order(&mut self, msg: &GetOpenOrder) -> Result<()> {
+        info!("Not too much logic needs to happen")
+    }
+
+    pub fn get_depth(&mut self, msg: &GetDepth) -> Result<()> {
+        info!("Just give back bids and asks")
     }
 }

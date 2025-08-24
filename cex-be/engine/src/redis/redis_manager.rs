@@ -1,9 +1,10 @@
-use futures_util::{future::Lazy, lock::Mutex};
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 use log::info;
 use redis::Client;
 
 static INSTANCE: Lazy<Mutex<RedisManager>> = Lazy::new(|| {
-    info!("Creating new Redis Manager instance");
+    info!("Creating new RedisManager instance");
     Mutex::new(RedisManager::new())
 });
 
