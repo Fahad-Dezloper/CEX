@@ -1,8 +1,10 @@
-./cex-be/try.txt
+cex-be/engine/try.txt
 exchange-proxy
 cex-fe
 cex-be/api/target
 cex-be/try.txt
 cex-be/api/cargo.lock
+cex-be/ws/cargo.lock
 cex-be/engine/target
 cex-be/engine/Cargo.lock
+cex-be/ws/target

@@ -23,7 +23,7 @@ impl Engine {
         };
 
         engine.set_base_balances();
-        info!("Engine initialized with orderbooks: {:?}", engine.orderbooks.iter().map(|ob| ob.ticker()).collect::<Vec<_>>());
+        info!("Engine initialized with orderbooks: {:?}", engine.orderbook.iter().map(|ob| ob.ticker()).collect::<Vec<_>>());
         engine
     }
 
@@ -50,8 +50,9 @@ impl Engine {
         match data {
             EngineData::Order(order_data) => {
                 println!("Creating order: at price {} {}", order_data.price, order_data.market);
-                match self.create_order(&order_data) {
-                    Ok((executed_qty, fills, order_id)) => {
+                if let Some(orderbook) = self.orderbook.iter_mut().find(|ob| ob.ticker() == order_data.market) {
+                    match orderbook.create_order(&order_data) {
+                        Ok((executed_qty, fills, order_id)) => {
                         // Here you would send a success message to the API
                         // RedisManager::get_instance().lock().unwrap().send_to_api(
                         //     &order_data.user_id,
@@ -74,6 +75,9 @@ impl Engine {
                         println!("Failed to create order: {}", e);
                     }
                 }
+            } else {
+                println!("Market not found: {}", order_data.market);
+            }
             }
             _ => {
                 println!("Invalid data for CreateOrder");
@@ -81,13 +85,14 @@ impl Engine {
         }
     }
 
-    fn handle_cancel_order(&self, data: EngineData) {
+    fn handle_cancel_order(&mut self, data: EngineData) {
         println!("CANCEL Order");
         match data {
             EngineData::DeleteOrder(delete_order_data) => {
                 println!("Cancel Order: of price {} {}", delete_order_data.market, delete_order_data.order_id);
-                match self.cancel_order(&delete_order_data){
-                    Ok((order_id, executed_qty, remain_qty)) => {
+                if let Some(orderbook) = self.orderbook.iter_mut().find(|ob| ob.ticker() == delete_order_data.market) {
+                    match orderbook.cancel_order(&delete_order_data) {
+                        Ok(()) => {
                         // Here you would send a success message to the API
                         // RedisManager::get_instance().lock().unwrap().send_to_api(
                         //      &delete_order_data.order_id,
@@ -97,12 +102,15 @@ impl Engine {
                         //     remain_qty
                         // } 
                         // ).unwrap()
-                        println!("Order Cancelled Successfully: {}", orderDeleted)
+                        println!("Order Cancelled Successfully")
                     }
                     Err(e) => {
                         println!("Failed to Cancel Order: {}", e);
                     }
                 }
+            } else {
+                println!("Market not found: {}", delete_order_data.market);
+            }
             }
             _=> {
                 println!("Invalid data for delete order")
@@ -110,19 +118,23 @@ impl Engine {
         }
     }
 
-    fn handle_get_open_orders(&self, data: EngineData) {
+    fn handle_get_open_orders(&mut self, data: EngineData) {
         println!("GET_OPEN_ORDERS");
         match data {
             EngineData::OpenOrder(open_order_data) => {
                 println!("Getting Open Orders");
-                match self.open_order(&open_order_data) {
-                    Ok(()) => {
+                if let Some(orderbook) = self.orderbook.iter_mut().find(|ob| ob.ticker() == open_order_data.market) {
+                    match orderbook.open_order(&open_order_data) {
+                        Ok(()) => {
                         println!("Order Opened successfully")
                     }
                     Err(e) => {
                         println!("Failed to fetch Open Orders")
                     }
                 }
+            } else {
+                println!("Market not found: {}", open_order_data.market);
+            }
             }
             _ => {
                 println!("Invalid data for open orders")
@@ -141,13 +153,14 @@ impl Engine {
         // }
     }
 
-    fn handle_get_depth(&self, data: EngineData) {
+    fn handle_get_depth(&mut self, data: EngineData) {
         println!("GET_DEPTH");
         match data {
             EngineData::Depth(market_data) => {
                 println!("Market data is here: {:?}", market_data.market);
-                match self.get_depth(&market_data) {
-                    Ok((bids, asks)) => {
+                if let Some(orderbook) = self.orderbook.iter_mut().find(|ob| ob.ticker() == market_data.market) {
+                    match orderbook.get_depth(&market_data) {
+                        Ok((bids, asks)) => {
                         println!("Returning bids and asks: bids = {:?}, asks = {:?}", bids, asks);
                         // TODO: Call function to send depth via redisManager
                     }
@@ -155,6 +168,9 @@ impl Engine {
                         println!("Failed to get Depth")
                     }
                 }
+            } else {
+                println!("Market not found: {}", market_data.market);
+            }
             }
             _=> {
                 println!("Invalid market data recieved")
@@ -165,29 +181,4 @@ impl Engine {
 
 
 
-
-
-
-
-    // real logic functions
-    pub fn create_order(
-        &mut self,
-        msg: &CreateOrderData
-    ) -> Result<(f64, Vec<Fill>, String), String> {
-        info!("Creating order for market: {:?}", msg.market);
-        // Placeholder logic: return dummy values for now
-        Ok((0.0, Vec::new(), String::from("order_id_placeholder")))
-    }
-
-    pub fn cancel_order(&mut self, msg: &DeleteOrderData) -> Result<()> {
-        info!("Alot of logic needs to happen here");
-    }
-
-    pub fn open_order(&mut self, msg: &GetOpenOrder) -> Result<()> {
-        info!("Not too much logic needs to happen")
-    }
-
-    pub fn get_depth(&mut self, msg: &GetDepth) -> Result<()> {
-        info!("Just give back bids and asks")
-    }
 }
