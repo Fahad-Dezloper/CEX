@@ -1,19 +1,21 @@
-use std::{net::TcpStream};
-
-use tokio_tungstenite::tungstenite::WebSocket;
-
+use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
+use tokio::net::TcpStream;
+use futures::{SinkExt, StreamExt};
+use crate::types::{IncomingMessage, OutgoingMessage};
 
 pub struct User {
     id: String,
-    ws: WebSocket<TcpStream>,
+    ws: WebSocketStream<TcpStream>,
     subscription: Vec<String>
 }
 
+pub const SUBSCRIBE: &str = "SUBSCRIBE";
+pub const UNSUBSCRIBE: &str = "UNSUBSCRIBE";
 
 impl User {
     pub fn new(
         id: impl Into<String>,
-        ws: WebSocket<TcpStream>,
+        ws: WebSocketStream<TcpStream>,
     ) -> Self {
         Self { id: id.into(), ws, subscription: Vec::new() }
     }
@@ -23,5 +25,40 @@ impl User {
     }
     pub fn unsubscribe(&mut self, subscription: String) {
         self.subscription.retain(|s| s.to_string() != subscription);
+    }
+
+    pub async fn amit(&mut self, message: OutgoingMessage) -> anyhow::Result<()> {
+        let json = serde_json::to_string(&message)?;
+        self.ws.send(Message::Text(json.into())).await.map_err(|e| anyhow::anyhow!("WebSocket send error: {}", e))?;
+        Ok(())
+    }
+
+    pub async fn listen(mut self) {
+        while let Some(msg) = self.ws.next().await {
+            match msg {
+                Ok(Message::Text(text)) => {
+                    if let Ok(parsed) = serde_json::from_str::<IncomingMessage>(&text) {
+                        match parsed.method.as_str() {
+                            SUBSCRIBE => {
+                                for s in parsed.params {
+                                    self.subscribe(s);
+                                }
+                            }
+                            UNSUBSCRIBE => {
+                                for s in parsed.params {
+                                    self.unsubscribe(s);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("Websocket error for user {}: {:?}", self.id, e);
+                    break;
+                }
+            }
+        }
     }
 }

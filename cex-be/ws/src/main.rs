@@ -5,6 +5,7 @@ use futures::{StreamExt, SinkExt};
 use tokio_tungstenite::accept_async;
 
 mod user;
+pub mod types;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
