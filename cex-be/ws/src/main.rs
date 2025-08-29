@@ -7,6 +7,7 @@ use tokio_tungstenite::accept_async;
 mod user;
 pub mod types;
 mod subscription_manager;
+mod user_manager;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

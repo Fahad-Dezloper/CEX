@@ -1,23 +1,28 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap};
 
 use anyhow::Ok;
-use futures::StreamExt;
+use futures::{ StreamExt };
 use redis::Client;
 use tokio::task;
+use std::sync::Arc;
+
+use crate::user_manager::{UserManager};
 
 pub struct SubscriptionManager{
     subscription: HashMap<String, Vec<String>>,
     reverse_subscriptions: HashMap<String, Vec<String>>,
-    redis_client: Client
+    redis_client: Client,
+    user_manager: Arc<UserManager>
 }
 
 impl SubscriptionManager {
-    pub fn new(redis_url: &str) -> anyhow::Result<Self> {
+    pub fn new(redis_url: &str, user_manager: Arc<UserManager>) -> anyhow::Result<Self> {
         let client = Client::open(redis_url)?;
         Ok(Self {
             subscription: HashMap::new(),
             reverse_subscriptions: HashMap::new(),
-            redis_client: client
+            redis_client: client,
+            user_manager
         })
     }
 
@@ -55,22 +60,29 @@ impl SubscriptionManager {
             pubsub.subscribe(subscription.clone()).await?;
 
             // background task to handle messages from this channel
+            let user_manager = Arc::new(self.user_manager.clone());
             task::spawn(async move {
                 let mut pubsub = pubsub;
-                while let Ok(msg) = pubsub.on_message().next().await {
+                while let Some(msg) = pubsub.on_message().next().await {
                     let payload: String = msg.get_payload().unwrap_or_default();
                     let channel = msg.get_channel_name().to_string();
                     println!("Received from Redis: {payload} on {channel}");
 
-                    let mut manager = manager.lock().await;
-                    manager.send_message(&channel, &payload).await;
+                    let outgoing_msg = crate::types::OutgoingMessage {
+                        event: channel.clone(),
+                        data: payload.clone(),
+                    };
+                    
+                    // Send to all users subscribed to this channel
+                    if let Err(e) = user_manager.emit_to_user(&channel, outgoing_msg).await {
+                        eprintln!("Failed to emit message: {}", e);
+                    }
                 }
             });
         }
 
         Ok(())
     }
-
 
     pub async fn unsubscribe(&mut self, user_id: String, subscription: String) -> anyhow::Result<()> {
         // 1. Remove from user -> topics map
@@ -94,40 +106,38 @@ impl SubscriptionManager {
         Ok(())
     }
 
-    pub async fn start_listener(&self) -> anyhow::Result<()> {
-        let mut pubsub_conn = self.redis_client.get_async_connection().await
-            .expect("Failed to get redis connection")
-            .into_pubsub();
-        let mut stream = pubsub_conn.on_message();
-        let reverse_subs = Arc::clone(&self.reverse_subscriptions);
-        let user_manager = Arc::clone(&self.user_manager);
+    pub async fn user_left(&mut self, user_id: &str) -> anyhow::Result<()> {
+        if let Some(subs) = self.subscription.get(user_id) {
+            // clone because we'll mutate while iterating
+            let subs_to_remove = subs.clone();
+            for s in subs_to_remove {
+                self.unsubscribe(user_id.to_string(), s).await?;
+            }
+        }
 
-        tokio::spawn(async move {
-            while let Some(msg) = stream.next().await {
-                let channel: String = msg.get_channel().unwrap();
-                let payload: String = msg.get_payload().unwrap();
+        println!("user left {}", user_id);
+        Ok(())
+    }
 
-                // Parse the payload into JSON
-                let parsed: serde_json::Value = match serde_json::from_str(&payload) {
-                    Ok(val) => val,
-                    Err(_) => continue,
+    // redisCallbackHandler
+    pub async fn handle_redis_message(&self, channel: &str, payload: &str) {
+        if let Some(user_ids) = self.reverse_subscriptions.get(channel){
+            for user_id in user_ids {
+                let outgoing_msg = crate::types::OutgoingMessage {
+                    event: channel.to_string(),
+                    data: payload.to_string(),
                 };
-
-                // Find users susbcribed to this channel
-                let users = {
-                    let map = reverse_subs.lock().await;
-                    map.get(&channel).cloned().unwrap_or_default()
-                };
-
-                for user_id in users {
-                    if let Some(user) = UserManager::get_instance().get_user(&user_id).await {
-                        user.emit(parsed.clone()).await;
-                    }                
+                if let Err(e) = self.user_manager.emit_to_user(user_id, outgoing_msg).await {
+                    eprintln!("Failed to emit message to user {}: {}", user_id, e);
                 }
             }
-        });
+        }
+    }
 
-        Ok(())
+    pub async fn get_user(&self, user_id: &str) -> Option<&mut crate::user::User> {
+        // This should return the actual user from your UserManager
+        // For now, returning None as placeholder
+        None
     }
 
 

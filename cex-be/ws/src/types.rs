@@ -6,7 +6,6 @@ pub struct OutgoingMessage {
     pub data: String
 }
 
-
 #[derive(Deserialize)]
 pub struct IncomingMessage {
     pub method: String,
