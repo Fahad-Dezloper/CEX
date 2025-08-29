@@ -21,10 +21,16 @@ impl User {
     }
 
     pub fn subscribe(&mut self, subscription: String) {
-        self.subscription.push(subscription);
+        self.subscription.push(subscription.clone());
+
+        let mut manager = self.subscription_manager.lock().await;
+        manager.subscribe(self.id.clone(), subscription);
     }
     pub fn unsubscribe(&mut self, subscription: String) {
         self.subscription.retain(|s| s.to_string() != subscription);
+
+        let mut manager = self.subscription_manager.lock().await;
+        manager.unsubscribe(self.id.clone(), subscription.to_string());
     }
 
     pub async fn amit(&mut self, message: OutgoingMessage) -> anyhow::Result<()> {
