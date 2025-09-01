@@ -31,7 +31,7 @@ impl User {
     }
 
     pub async fn subscribe(&mut self, subscription: String) {
-        self.subscription.push(subscription.clone());
+        self.subscription.push(subscription.clone()); // i have to add the market user is subscribing to before sending it to the manager
 
         let mut manager = self.subscription_manager.lock().await;
         manager.subscribe(self.id.clone(), subscription).await.unwrap_or_else(|e| {
@@ -54,6 +54,8 @@ impl User {
         Ok(())
     }
 
+
+    // this will call subscribe unsubscribe because this listening the events
     pub async fn listen(mut self) {
         while let Some(msg) = self.ws.next().await {
             match msg {
@@ -62,11 +64,13 @@ impl User {
                         match parsed.method.as_str() {
                             SUBSCRIBE => {
                                 for s in parsed.params {
+                                    println!("what is s here {}", s);
                                     self.subscribe(s).await;
                                 }
                             }
                             UNSUBSCRIBE => {
                                 for s in parsed.params {
+                                    println!("what is s here for unsubscirbe {}", s);
                                     self.unsubscribe(s).await;
                                 }
                             }
@@ -82,4 +86,5 @@ impl User {
             }
         }
     }
+
 }

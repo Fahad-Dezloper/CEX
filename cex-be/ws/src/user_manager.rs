@@ -41,12 +41,6 @@ impl UserManager {
         }
     }
 
-    pub async fn get_user(&self, id: &str) -> Option<&mut User> {
-        // This is a simplified approach - in practice you might want to use a different pattern
-        // since we can't return a mutable reference from a mutex guard easily
-        None
-    }
-
     pub async fn emit_to_user(&self, user_id: &str, message: crate::types::OutgoingMessage) -> anyhow::Result<()> {
         if let Some(user) = self.users.lock().await.get_mut(user_id) {
             user.emit(message).await

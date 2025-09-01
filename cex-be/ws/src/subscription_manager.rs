@@ -28,9 +28,9 @@ impl SubscriptionManager {
 
     pub fn get_subscriptions(&self, user_id: &str) -> Vec<String> {
         self.subscription
-            .get(user_id)
-            .cloned()
-            .unwrap_or_default()
+            .get(user_id) // look up user_id in hashmap
+            .cloned() // have to clone so that it can be unwrapped
+            .unwrap_or_default() // does this Some(vec!["sports", "music"]) → ["sports", "music"]
     }
 
     pub async fn subscribe(&mut self, user_id: String, subscription: String) -> anyhow::Result<()> {
@@ -44,13 +44,14 @@ impl SubscriptionManager {
         // 2. Add to user -> topics map
         self.subscription
             .entry(user_id.clone())
-            .or_default()
+            .or_default() //.entry checks if this user id exist and return that userid if it exists if it doesn't exist or_default mutably add the user id to the hashmap
             .push(subscription.clone());
 
         // 3. Add to topic -> users map
         let user = self.reverse_subscriptions
             .entry(subscription.clone())
-            .or_default();
+            .or_default(); // it will return this &mut Vec<String>
+        // now it will still return this ()
         user.push(user_id.clone());
 
         // 4. If first user for this topic, subscribe in Redis
@@ -60,7 +61,7 @@ impl SubscriptionManager {
             pubsub.subscribe(subscription.clone()).await?;
 
             // background task to handle messages from this channel
-            let user_manager = Arc::new(self.user_manager.clone());
+            let user_manager = Arc::new(self.user_manager.clone()); // everything inside task spawn must be static not borrowed that's why cloned it. because task may outlive the function
             task::spawn(async move {
                 let mut pubsub = pubsub;
                 while let Some(msg) = pubsub.on_message().next().await {
@@ -133,12 +134,5 @@ impl SubscriptionManager {
             }
         }
     }
-
-    pub async fn get_user(&self, user_id: &str) -> Option<&mut crate::user::User> {
-        // This should return the actual user from your UserManager
-        // For now, returning None as placeholder
-        None
-    }
-
 
 }
