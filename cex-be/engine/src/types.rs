@@ -7,7 +7,7 @@ pub enum MessageFromApi {
     CANCEL_ORDER(CancelOrderData),
     ON_RAMP(ONRAMPDATA),
     GET_DEPTH(GETDEPTHDATA),      
-    GET_OPEN_ORDERS,
+    GET_OPEN_ORDERS(GETOPENORDERS),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -27,26 +27,26 @@ pub struct CreateOrderData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CancelOrderData {
-    order_id: String,
-    market: String,
+    pub order_id: String,
+    pub market: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ONRAMPDATA {
-    amount: String,
-    user_id: String,
-    txn_id: String
+    pub amount: String,
+    pub user_id: String,
+    pub txn_id: String
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GETDEPTHDATA {
-    market: String,
+    pub market: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GETOPENORDERS {
-    user_id: String,
-    market: String,
+    pub user_id: String,
+    pub market: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

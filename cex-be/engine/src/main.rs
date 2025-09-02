@@ -19,7 +19,7 @@ fn main() -> RedisResult<()> {
     loop {
         let response: Option<(String, String)> = con.brpop("messages", 0.0)?;
         if let Some((_key, msg)) = response {
-            println!("Got: {}", msg);
+            // println!("Got: {}", msg);
             engine.process(serde_json::from_str(&msg).unwrap());
             // serde_json::from_str(&msg).unwrap()
         }
