@@ -1,35 +1,27 @@
-use redis::Commands;
-use std::thread::sleep;
-use std::time::Duration;
+use std::{thread, time::Duration};
 
-use crate::main_engine::Enginee;
-use crate::types::Process;
-mod main_engine;
+use redis::{RedisResult, Commands};
+use crate::engine::Engine;
 mod types;
-mod orderbook;
-mod redis;
 
 
-fn main() {
-    let engine: Enginee = Enginee::new();
+mod engine;
+fn main() -> RedisResult<()> {
+    let engine = Engine::new();
+    println!("hi there");
 
-    let client = redis::Client::open("redis://127.0.0.1/").expect("failed to create Redis client");
-    let mut conn = client
-        .get_connection()
-        .expect("failed to get Redis connection");
-    println!("Connected to Redis");
+    let client = redis::Client::open("redis://127.0.0.1:6379")?;
+    let mut con = client.get_connection()?;
+
+    let pong: String = redis::cmd("PING").query(&mut con)?;
+    println!("connected to redis: {}", pong);
 
     loop {
-        let response: redis::RedisResult<Option<String>> = conn.rpop("message", None);
-
-        if let Ok(Some(resp)) = response {
-            match serde_json::from_str::<Process>(&resp) {
-                Ok(json) => engine.process(json),
-                Err(err) => eprintln!("Json Parse err {}", err)
-            }
-        } else {
-            sleep(Duration::from_millis(100));
+        let response: Option<(String, String)> = con.brpop("messages", 0.0)?;
+        if let Some((_key, msg)) = response {
+            println!("Got: {}", msg);
+            engine.process(serde_json::from_str(&msg).unwrap());
+            // serde_json::from_str(&msg).unwrap()
         }
-        
     }
 }
