@@ -1,4 +1,7 @@
-use redis::Client;
+use futures_util::lock::Mutex;
+use log::info;
+use once_cell::sync::Lazy;
+use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -40,10 +43,56 @@ pub struct RedisManager {
     db_client: Client
 }
 
+static INSTANCE: Lazy<Mutex<RedisManager>> = Lazy::new(|| {
+    info!("Creating new RedisManager instance");
+    Mutex::new(RedisManager::new())
+});
+
 impl RedisManager {
-    pub fn new() {
+    pub fn new() -> Self {
         //redis 1 pubsub
+        println!("Initializing redis manager");
+        let redis_client = Client::open("redis://localhost:6379".to_string()).expect("Fail to connect redis client");
         //redis 2 pubsub
+        let ws_client = Client::open("redis://localhost:6380".to_string()).expect("Fail to connect ws client");
         //redis 3 queue/db
+        let db_client = Client::open("redis://localhost:6381".to_string()).expect("Fail to connect db client");
+
+        Self {
+            redis_client,
+            ws_client,
+            db_client,
+        }
     }
+
+    pub fn get_instance() -> &'static Mutex<RedisManager> {
+        info!("Getting Redis instance");
+        &INSTANCE
+    }
+
+    pub fn pop_message(&self) -> RedisResult<Option<String>> {
+        let mut conn = self.redis_client.get_connection()?;
+        let response: Option<(String, String)> = redis::cmd("BRPOP")
+            .arg("messages")
+            .arg(1) // block for 1 second
+            .query(&mut conn)?;
+
+        Ok(response.map(|(_, msg)| msg))
+    }
+
+
+    /// Publish updates for WebSocket consumers
+    pub fn publish_ws(&self, channel: &str, payload: &str) -> RedisResult<()> {
+        let mut conn = self.ws_client.get_connection()?;
+        redis::cmd("PUBLISH").arg(channel).arg(payload).execute(&mut conn);
+        Ok(())
+    }
+
+    /// Push events into DB queue for persistence
+    pub fn push_db(&self, payload: &str) -> RedisResult<()> {
+        let mut conn = self.db_client.get_connection()?;
+        redis::cmd("RPUSH").arg("db_events").arg(payload).execute(&mut conn);
+        Ok(())
+    }
+
 }

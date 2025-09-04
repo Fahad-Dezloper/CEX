@@ -1,29 +1,27 @@
-use std::{thread, time::Duration};
+use redis::RedisResult;
+use crate::{engine::Engine, redis_manager::RedisManager};
+use serde_json;
 
-use redis::{RedisResult, Commands};
-use crate::engine::Engine;
 mod types;
-
-
 mod engine;
 mod redis_manager;
 
 fn main() -> RedisResult<()> {
-    let engine = Engine::new();
-    println!("hi there");
+    let mut engine = Engine::new();
+    println!("Engine initialized");
 
-    let client = redis::Client::open("redis://127.0.0.1:6379")?;
-    let mut con = client.get_connection()?;
-
-    let pong: String = redis::cmd("PING").query(&mut con)?;
-    println!("connected to redis: {}", pong);
+    let redis_manager = RedisManager::new();
+    println!("Redis manager initialized");
 
     loop {
-        let response: Option<(String, String)> = con.brpop("messages", 0.0)?;
-        if let Some((_key, msg)) = response {
-            // println!("Got: {}", msg);
-            engine.process(serde_json::from_str(&msg).unwrap());
-            // serde_json::from_str(&msg).unwrap()
+        if let Ok(Some(msg)) = redis_manager.pop_message() {
+            println!("Received message: {}", msg);
+
+            // Deserialize incoming order
+            let order = serde_json::from_str(&msg).unwrap();
+
+            // Process order inside engine
+            engine.process(order);
         }
     }
 }
