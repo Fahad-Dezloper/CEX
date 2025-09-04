@@ -6,6 +6,8 @@ mod types;
 
 
 mod engine;
+mod redis_manager;
+
 fn main() -> RedisResult<()> {
     let engine = Engine::new();
     println!("hi there");
