@@ -17,6 +17,7 @@ pub struct Fill {
     market_order_id: String
 }
 
+
 impl OrderBook {
     fn new(
         base_asset: String,
@@ -40,16 +41,33 @@ impl OrderBook {
         format!("{}-{}", self.base_asset, self.quote_asset)
     }
 
-    pub fn addOrder(&self, order: Order) -> String {
-        format!("hi there")
+    pub fn addOrder(&mut self, mut order: Order) -> (f64, Vec<String>) {
+        if order.side == crate::types::Side::Buy {
+            let (executed_qty, fills) = (0.0, Vec::new()); // TODO: self.matchBid(order);
+            order.filled = executed_qty;
+            if executed_qty == order.quantity {
+                return (executed_qty, fills);
+            }
+            self.bids.push(order);
+            return (executed_qty, fills);
+        } else {
+            let (executed_qty, fills) = (0.0, Vec::new()); // TODO: self.matchAsk(order);
+            order.filled = executed_qty;
+            if executed_qty == order.quantity {
+                return (executed_qty, fills);
+            }
+
+            self.asks.push(order);
+            return (executed_qty, fills);
+        }
     }
 
-    pub fn matchBid(&self, order: Order) -> String {
-        format!("match bid")
+    pub fn matchBid(&self, order: Order) -> (f64, Vec<String>) {
+        (0.0, Vec::new()) // TODO: implement matching logic
     }
 
-    pub fn matchAsk(&self, order: Order) -> String {
-        format!("match bid")
+    pub fn matchAsk(&self, order: Order) -> (f64, Vec<String>) {
+        (0.0, Vec::new()) // TODO: implement matching logic
     }
 
     pub fn getDepth() -> String {

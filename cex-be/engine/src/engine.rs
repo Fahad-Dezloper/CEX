@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use uuid::Uuid;
+
 use crate::{orderbook::OrderBook, types::{ProcessInput, Side}};
 
 pub struct UserBalance {
@@ -13,12 +15,12 @@ pub struct Engine{
 }
 
 pub struct Order {
-    price: f64,
-    quantity: f64,
-    order_id: String,
-    filled: f64,
-    side: Side,
-    user_id: String
+    pub price: f64,
+    pub quantity: f64,
+    pub order_id: String,
+    pub filled: f64,
+    pub side: Side,
+    pub user_id: String
 }
 
 
@@ -83,10 +85,14 @@ impl Engine {
         side: &str,
         user_id: &str,
     ) -> (u64, Vec<String>, String) {
-        let orderbook = self.orderbooks
+        // Find orderbook index first to avoid borrowing conflicts
+        let orderbook_index = match self.orderbooks
                             .iter()
-                            .find(|o| o.ticker() == market)
-                            .ok_or_else(|| "No orderbook found".to_string());
+                            .position(|o| o.ticker() == market) {
+            Some(index) => index,
+            None => return (0, Vec::new(), "No orderbook found".to_string())
+        };
+
         if let Some((base, quote)) = market.split_once('-') {
             println!("Base: {}", base);   // BTC
             println!("Quote: {}", quote); // USD
@@ -98,16 +104,27 @@ impl Engine {
             println!("btc = {}, usd = {}", btc, usd);
         }
 
+        let side_enum = match side {
+            "buy" => Side::Buy,
+            "sell" => Side::Sell,
+            _ => return (0, Vec::new(), "Invalid side".to_string())
+        };
+
         // do check and lock funds
         if let Some((base, quote)) = market.split_once('-') {
-            let side_enum = match side {
-                "buy" => Side::Buy,
-                "sell" => Side::Sell,
-                _ => return (0, Vec::new(), "Invalid side".to_string())
-            };
-            self.check_and_lock_funds(base.to_string(), quote.to_string(), side_enum, user_id.to_string(), price.to_string(), quantity);
+            self.check_and_lock_funds(base.to_string(), quote.to_string(), side_enum.clone(), user_id.to_string(), price.to_string(), quantity);
         }
 
+        let order = Order { 
+            price: price, 
+            quantity: quantity as f64, 
+            order_id: Uuid::new_v4().to_string(), 
+            filled: 0.0, 
+            side: side_enum, 
+            user_id: user_id.to_string() 
+        };
+
+        let (executed_qty, fills) = self.orderbooks[orderbook_index].addOrder(order);
 
         println!(
             "Creating order: market={}, price={}, quantity={}, side={}, user_id={}",
