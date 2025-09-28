@@ -49,7 +49,7 @@ pub struct GETOPENORDERS {
     pub market: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
     Buy,

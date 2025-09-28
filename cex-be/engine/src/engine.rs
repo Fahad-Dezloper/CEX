@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{orderbook::{self, OrderBook}, types::{ProcessInput, Side}};
+use crate::{orderbook::OrderBook, types::{ProcessInput, Side}};
 
 pub struct UserBalance {
     available: f64,
@@ -8,8 +8,8 @@ pub struct UserBalance {
 }
 
 pub struct Engine{
-    orderbook: Vec<OrderBook>,
-    balance: HashMap<String, UserBalance>
+    orderbooks: Vec<OrderBook>,
+    balances: HashMap<String, HashMap<String, UserBalance>>
 }
 
 pub struct Order {
@@ -26,8 +26,8 @@ impl Engine {
     pub fn new() -> Self {
         println!("wassup my man");
         Self {
-            orderbook: Vec::new(),
-            balance: HashMap::new()
+            orderbooks: Vec::new(),
+            balances: HashMap::new()
         }
     }
 
@@ -87,38 +87,74 @@ impl Engine {
                             .iter()
                             .find(|o| o.ticker() == market)
                             .ok_or_else(|| "No orderbook found".to_string());
+        if let Some((base, quote)) = market.split_once('-') {
+            println!("Base: {}", base);   // BTC
+            println!("Quote: {}", quote); // USD
+
+             // Store them individually
+            let btc = base.to_string();
+            let usd = quote.to_string();
+
+            println!("btc = {}, usd = {}", btc, usd);
+        }
 
         // do check and lock funds
+        if let Some((base, quote)) = market.split_once('-') {
+            let side_enum = match side {
+                "buy" => Side::Buy,
+                "sell" => Side::Sell,
+                _ => return (0, Vec::new(), "Invalid side".to_string())
+            };
+            self.check_and_lock_funds(base.to_string(), quote.to_string(), side_enum, user_id.to_string(), price.to_string(), quantity);
+        }
 
 
         println!(
             "Creating order: market={}, price={}, quantity={}, side={}, user_id={}",
             market, price, quantity, side, user_id
         );
-        (executed_qty, fills, order_id)
+        (0, Vec::new(), "order_id".to_string())
     }
 
     // check and lock funds
-    pub fn check_and_lock_funds(baseAsset: String, quoteAsset: String, side: Side, user_id: String, asset: String, price: String, quantity: u64) {
+    // baseAsset = "BTC" quoteAsset = "USDC" side = "buy" price = "20000" quantity = "0.5" userId = "u1"
+    pub fn check_and_lock_funds(&mut self, baseAsset: String, quoteAsset: String, side: Side, user_id: String, price: String, quantity: u64) {
         if side == Side::Buy {
-            // Assuming self.balances: HashMap<String, HashMap<String, Balance>>
+            // self.balances: HashMap<String, HashMap<String, Balance>>
             // and Balance { available: f64, locked: f64 }
             let user_balances = self.balances.get_mut(&user_id).expect("User not found");
             let quote_balance = user_balances.get_mut(&quoteAsset).expect("Quote asset not found");
             let price_f64: f64 = price.parse().expect("Invalid price");
+
+            // balances.get("u1") = {
+            //     USDT: { available: 15000, locked: 0 },
+            //     BTC: { available: 2, locked: 0 }
+            //  }
+            // Required funds = quantity * price = 0.5 * 20000 = 10000 USDT
             let required = quantity as f64 * price_f64;
             if quote_balance.available < required {
                 panic!("Insufficient funds");
             }
+
+            // USDT.available = 15000 - 10000 = 5000
             quote_balance.available -= required;
+            // USDT.locked = 0 + 10000 = 10000
             quote_balance.locked += required;
         } else {
             let user_balances = self.balances.get_mut(&user_id).expect("User not found");
             let base_balance = user_balances.get_mut(&baseAsset).expect("Base asset not found");
+            // Check if user has enough BTC (base asset)
+            // {
+            //    USDT: { available: 5000, locked: 10000 },
+            //    BTC: { available: 2, locked: 0 }
+            // }
             if base_balance.available < quantity as f64 {
                 panic!("Insufficient funds");
             }
+
+            // BTC.available = 2 - 0.5 = 1.5
             base_balance.available -= quantity as f64;
+            // BTC.locked = 0 + 0.5 = 0.5
             base_balance.locked += quantity as f64;
         }
     }
