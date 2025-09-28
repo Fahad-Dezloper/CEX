@@ -5,6 +5,7 @@ use serde_json;
 mod types;
 mod engine;
 mod redis_manager;
+mod orderbook;
 
 fn main() -> RedisResult<()> {
     let mut engine = Engine::new();

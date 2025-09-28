@@ -80,7 +80,6 @@ impl RedisManager {
         Ok(response.map(|(_, msg)| msg))
     }
 
-
     /// Publish updates for WebSocket consumers
     pub fn publish_ws(&self, channel: &str, payload: &str) -> RedisResult<()> {
         let mut conn = self.ws_client.get_connection()?;
