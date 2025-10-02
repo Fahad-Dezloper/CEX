@@ -25,7 +25,7 @@ pub struct CreateOrderData {
     user_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CancelOrderData {
     pub order_id: String,
     pub market: String,
@@ -49,7 +49,7 @@ pub struct GETOPENORDERS {
     pub market: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
     Buy,

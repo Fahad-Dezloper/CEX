@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use crate::{orderbook::OrderBook, types::{ProcessInput, Side}};
+use crate::{orderbook::{Fill, OrderBook, PriceLevel}, types::{ProcessInput, Side}};
 
 pub struct UserBalance {
     available: f64,
@@ -10,10 +10,11 @@ pub struct UserBalance {
 }
 
 pub struct Engine{
-    orderbooks: Vec<OrderBook>,
-    balances: HashMap<String, HashMap<String, UserBalance>>
+    pub orderbooks: Vec<OrderBook>,
+    pub balances: HashMap<String, HashMap<String, UserBalance>>
 }
 
+#[derive(Clone)]
 pub struct Order {
     pub price: f64,
     pub quantity: f64,
@@ -44,23 +45,115 @@ impl Engine {
                 println!("Fills: {:?}", fills);
                 println!("Order ID: {}", order_id);
                 // send  to redis manager
+
+
                 // if error send to redis order cancelled
+            },
+            crate::types::MessageFromApi::GET_DEPTH(_) => {
+                // handled below via if-let
+                if let crate::types::MessageFromApi::GET_DEPTH(depth_data) = &msg.message {
+                    println!("Market: {}", depth_data.market);
+                    let market = depth_data.market.clone();
+                    let orderbook = self.orderbooks.iter().find(|o| o.ticker() == market).expect("Orderbook not found");
+
+                    
+                    // redis call with type DEPTH
+                }
             },
             crate::types::MessageFromApi::CANCEL_ORDER(_) => {
                 // cancel order function
                 if let crate::types::MessageFromApi::CANCEL_ORDER(cancel_data) = &msg.message {
+                    let order_id = &cancel_data.order_id;
+                    let cancel_market = &cancel_data.market;
+                    let cancel_orderbook_index = self.orderbooks
+                        .iter()
+                        .position(|o| o.ticker() == cancel_market.as_str())
+                        .expect("Orderbook not found");
+                    
+                    let (base_asset, quote_asset) = match cancel_market.split_once('-') {
+                        Some((base, quote)) => (base.to_string(), quote.to_string()),
+                        None => {
+                            println!("Invalid market format");
+                            return;
+                        }
+                    };
+                    
+                    let order_info = self.orderbooks[cancel_orderbook_index]
+                        .asks
+                        .iter()
+                        .find(|o| o.order_id == order_id.as_str())
+                        .map(|o| (o.clone(), Side::Sell))
+                        .or_else(|| {
+                            self.orderbooks[cancel_orderbook_index]
+                                .bids
+                                .iter()
+                                .find(|o| o.order_id == order_id.as_str())
+                                .map(|o| (o.clone(), Side::Buy))
+                        });
+
+                        if let Some((order, side)) = order_info {
+                            if side == Side::Buy {
+                                let price = self.orderbooks[cancel_orderbook_index].cancelBid(&order.order_id);
+                                let left_qty = (order.quantity - order.filled) * order.price;
+
+                                self.balances.get_mut(&order.user_id)
+                                    .expect("User not found")
+                                    .get_mut(&quote_asset)
+                                    .expect("Quote asset not found")
+                                    .available += left_qty;
+
+                                self.balances.get_mut(&order.user_id)
+                                    .expect("User not found")
+                                    .get_mut(&quote_asset)
+                                    .expect("Quote asset not found")
+                                    .locked -= left_qty;
+
+                                if let Some(price) = price {
+                                    self.send_updated_depth(price.to_string(), cancel_market.to_string());
+                                }
+                            } else {
+                                let price = self.orderbooks[cancel_orderbook_index].cancelAsk(&order.order_id);
+                                let left_qty = order.quantity - order.filled;
+                                self.balances.get_mut(&order.user_id)
+                                    .expect("User not found")
+                                    .get_mut(&base_asset)
+                                    .expect("Base asset not found")
+                                    .available += left_qty;
+
+                                self.balances.get_mut(&order.user_id)
+                                    .expect("User not found")
+                                    .get_mut(&base_asset)
+                                    .expect("Base asset not found")
+                                    .locked -= left_qty;
+
+                                if let Some(price) = price {
+                                    self.send_updated_depth(price.to_string(), cancel_market.to_string());
+                                }
+                            }
+                        } else {
+                            println!("Order not found: {}", order_id);
+                        }
+
+                        // redis manager call type ORDER_CANCELLED else error while cancelling order
                     println!("Cancel order: order_id = {}, market = {}", cancel_data.order_id, cancel_data.market);
                 }
-                // send to redis manager
             },
             crate::types::MessageFromApi::ON_RAMP(_) => {
                 // call on ramp fuction
                 if let crate::types::MessageFromApi::ON_RAMP(ramp_data) = &msg.message {
-                    println!("Ramp data Amount: {}, user_id: {}, txn_id: {}", ramp_data.amount, ramp_data.user_id, ramp_data.txn_id)
+                    println!("Ramp data Amount: {}, user_id: {}, txn_id: {}", ramp_data.amount, ramp_data.user_id, ramp_data.txn_id);
+
+                    let user_id = ramp_data.user_id.clone();
+                    let amount: f64 = match ramp_data.amount.parse() {
+                        Ok(val) => val,
+                        Err(e) => {
+                            println!("Failed to parse ramp_data.amount ('{}') as f64: {}", ramp_data.amount, e);
+                            0.0
+                        }
+                    };
+
+                    self.on_ramp(user_id, amount);
                 }
-                // break
-            },
-            crate::types::MessageFromApi::GET_DEPTH(_) => {
                 // get orderbook depth and send to redis
                 if let crate::types::MessageFromApi::GET_DEPTH(depth_data) = &msg.message {
                     println!("Market: {}", depth_data.market)
@@ -69,6 +162,10 @@ impl Engine {
             crate::types::MessageFromApi::GET_OPEN_ORDERS(_) => {
                 // get open orders
                 if let crate::types::MessageFromApi::GET_OPEN_ORDERS(open_order_data) = &msg.message {
+                    let open_order_book = self.orderbooks.iter().find(|o| o.ticker() == open_order_data.market).expect("Orderbook not found");
+                    let open_orders = open_order_book.getOpenOrders(open_order_data.user_id.clone());
+                    // redis call with type OPEN_ORDERS
+                    
                     println!("User Id: {} Market: {}", open_order_data.user_id, open_order_data.market);
                 }
                 // send to redis
@@ -84,20 +181,18 @@ impl Engine {
         quantity: u64,
         side: &str,
         user_id: &str,
-    ) -> (u64, Vec<String>, String) {
-        // Find orderbook index first to avoid borrowing conflicts
+    ) -> (f64, Vec<Fill>, String) {
         let orderbook_index = match self.orderbooks
                             .iter()
                             .position(|o| o.ticker() == market) {
             Some(index) => index,
-            None => return (0, Vec::new(), "No orderbook found".to_string())
+            None => return (0.0, Vec::<Fill>::new(), "No orderbook found".to_string())
         };
 
         if let Some((base, quote)) = market.split_once('-') {
             println!("Base: {}", base);   // BTC
             println!("Quote: {}", quote); // USD
 
-             // Store them individually
             let btc = base.to_string();
             let usd = quote.to_string();
 
@@ -107,7 +202,7 @@ impl Engine {
         let side_enum = match side {
             "buy" => Side::Buy,
             "sell" => Side::Sell,
-            _ => return (0, Vec::new(), "Invalid side".to_string())
+            _ => return (0.0, Vec::<Fill>::new(), "Invalid side".to_string())
         };
 
         // do check and lock funds
@@ -115,22 +210,57 @@ impl Engine {
             self.check_and_lock_funds(base.to_string(), quote.to_string(), side_enum.clone(), user_id.to_string(), price.to_string(), quantity);
         }
 
+        let new_order_id = Uuid::new_v4().to_string();
         let order = Order { 
             price: price, 
             quantity: quantity as f64, 
-            order_id: Uuid::new_v4().to_string(), 
+            order_id: new_order_id.clone(), 
             filled: 0.0, 
-            side: side_enum, 
+            side: side_enum.clone(), 
             user_id: user_id.to_string() 
+        };
+        let order_for_update = order.clone();
+
+        // Extract base and quote from market string
+        let (base, quote) = match market.split_once('-') {
+            Some((b, q)) => (b.to_string(), q.to_string()),
+            None => return (0.0, Vec::<Fill>::new(), "Invalid market format".to_string()),
         };
 
         let (executed_qty, fills) = self.orderbooks[orderbook_index].addOrder(order);
-
+        self.update_balances(
+            user_id.to_string(),
+            base.clone(),
+            quote.clone(),
+            side_enum,
+            executed_qty,
+            fills.clone(),
+        );
+        // create db trades
+        self.create_db_trades(fills.clone(), market, user_id.to_string());
+        self.update_db_trades(
+            order_for_update,
+            executed_qty,
+            fills.clone(),
+            market.to_string(),
+            user_id.to_string(),
+        );
+        self.publish_ws_depth_update(
+            fills.clone(),
+            price,
+            side_enum.clone(),
+            market.to_string(),
+        );
+        self.publish_ws_trades(
+            fills.clone(),
+            user_id.to_string(),
+            market.to_string(),
+        );
         println!(
             "Creating order: market={}, price={}, quantity={}, side={}, user_id={}",
             market, price, quantity, side, user_id
         );
-        (0, Vec::new(), "order_id".to_string())
+        (executed_qty, fills, new_order_id)
     }
 
     // check and lock funds
@@ -175,4 +305,188 @@ impl Engine {
             base_balance.locked += quantity as f64;
         }
     }
+
+    pub fn update_balances(&mut self, user_id: String, base: String, quote: String, side: Side, executed_qty: f64, fills: Vec<Fill>) {
+        if side == Side::Buy {
+            fills.iter().for_each(|fill| {
+                let price_f64: f64 = fill.price.parse().expect("Invalid price");
+                let qty_f64: f64 = fill.qty as f64;
+
+                let other_user_quote_balance = self.balances
+                    .get_mut(&fill.other_user_id)
+                    .expect("Other user not found")
+                    .get_mut(&quote)
+                    .expect("Quote asset not found");
+
+                other_user_quote_balance.available += price_f64 * qty_f64;
+                other_user_quote_balance.locked -= price_f64 * qty_f64;
+
+                let user_base_balance = self.balances
+                    .get_mut(&user_id)
+                    .expect("User not found")
+                    .get_mut(&base)
+                    .expect("Base asset not found");
+
+                user_base_balance.locked -= qty_f64;
+
+                user_base_balance.available += qty_f64;
+            });
+    } else {
+        fills.iter().for_each(|fill| {
+            let price_f64: f64 = fill.price.parse().expect("Invalid price");
+            let qty_f64: f64 = fill.qty as f64;
+
+            let other_user_quote_balance = self.balances
+                .get_mut(&fill.other_user_id)
+                .expect("Other user not found")
+                .get_mut(&quote)
+                .expect("Quote asset not found");
+
+            other_user_quote_balance.locked -= price_f64 * qty_f64;
+            other_user_quote_balance.available += price_f64 * qty_f64;
+
+            let user_base_balance = self.balances
+                .get_mut(&user_id)
+                .expect("User not found")
+                .get_mut(&base)
+                .expect("Base asset not found");
+
+            user_base_balance.locked -= qty_f64;
+            user_base_balance.available += qty_f64;
+        });
+        }
+    }
+
+    pub fn create_db_trades(&mut self, fills: Vec<Fill>, market: &str, user_id: String) {
+        //TODO: implement
+        fills.iter().for_each(|fills| {
+            println!("Trade ID: {}", fills.trade_id);
+            println!("Price: {}", fills.price);
+            println!("Qty: {}", fills.qty);
+            println!("Other User ID: {}", fills.other_user_id);
+            println!("Market Order ID: {}", fills.market_order_id);
+
+            //redis manager call type trade added
+        })
+    }
+
+    pub fn update_db_trades(&mut self, order: Order, executed_qty: f64, fills: Vec<Fill>, market: String, user_id: String) {
+
+        //redis manager call type ORDER_UPDATE here too
+
+
+        //TODO: implement
+        fills.iter().for_each(|fill| {
+            println!("Trade ID: {}", fill.trade_id);
+            println!("Price: {}", fill.price);
+            println!("Qty: {}", fill.qty);
+            println!("Other User ID: {}", fill.other_user_id);
+            println!("Market Order ID: {}", fill.market_order_id);
+            println!("Order ID: {}", order.order_id);
+            println!("Executed Qty: {}", executed_qty);
+            println!("Market: {}", market);
+            println!("User ID: {}", user_id);
+
+
+            //redis manager call type ORDER_UPDATE
+
+
+        })
+    }
+
+    pub fn publish_ws_trades(&mut self, fills: Vec<Fill>, user_id: String, market: String) {
+        fills.iter().for_each(|fills| {
+            println!("Trade ID: {}", fills.trade_id);
+            println!("Price: {}", fills.price);
+            println!("Qty: {}", fills.qty);
+            println!("Other User ID: {}", fills.other_user_id);
+            println!("Market Order ID: {}", fills.market_order_id);
+            
+
+            // make redis manager call publishMessage
+        })
+    }
+
+    pub fn publish_ws_depth_update(&mut self, fills: Vec<Fill>, price: f64, side: Side, market: String) {
+        println!("Price: {}", price);
+        // println!("Side: {}", side);
+        println!("Market: {}", market);
+
+        let orderbook_index = match self.orderbooks
+                            .iter()
+                            .position(|o| o.ticker() == market) {
+            Some(index) => index,
+            None => return
+        };
+
+        let depth = self.orderbooks[orderbook_index].getDepth();
+        if side == Side::Buy {
+            let fill_prices: Vec<String> = fills.iter().map(|f| f.price.to_string()).collect();
+            let updated_asks: Vec<&PriceLevel> = depth.asks.iter()
+                .filter(|ask| fill_prices.contains(&ask.price))
+                .collect();
+            let updated_bid = depth.bids.iter().find(|bid| bid.price == price.to_string());
+
+            // redis manager call publishMessage
+        } else {
+            let fill_prices: Vec<String> = fills.iter().map(|f| f.price.to_string()).collect();
+            let updated_bids: Vec<&PriceLevel> = depth.bids.iter()
+                .filter(|bid| fill_prices.contains(&bid.price))
+                .collect();
+            let updated_ask = depth.asks.iter().find(|ask| ask.price == price.to_string());
+
+            // redis manager call publishMessage
+        }
+
+        // make redis manager call publishMessage
+    }
+
+    pub fn send_updated_depth(&mut self, price: String, market: String) {
+        println!("Price: {}", price);
+        println!("Market: {}", market);
+        let orderbook = self.orderbooks
+            .iter()
+            .find(|o| o.ticker() == market)
+            .expect("Orderbook not found");
+        let depth = orderbook.getDepth();
+        let updated_asks: Vec<&PriceLevel> = depth.asks.iter()
+            .filter(|ask| ask.price == price)
+            .collect();
+        let updated_bids: Vec<&PriceLevel> = depth.bids.iter()
+            .filter(|bid| bid.price == price)
+            .collect();
+            
+        // redis manager call publishMessage
+    }
+
+    pub fn on_ramp(&mut self, user_id: String, amount: f64) {
+        println!("User ID: {}", user_id);
+        println!("Amount: {}", amount);
+
+        let base_currency = "USD".to_string(); 
+        match self.balances.get_mut(&user_id) {
+            None => {
+                let mut currency_map = std::collections::HashMap::new();
+                currency_map.insert(
+                    base_currency.clone(),
+                    UserBalance {
+                        available: amount,
+                        locked: 0.0,
+                    },
+                );
+                self.balances.insert(user_id.clone(), currency_map);
+            }
+            Some(user_balance) => {
+                user_balance
+                    .entry(base_currency.clone())
+                    .and_modify(|bal| bal.available += amount)
+                    .or_insert(UserBalance {
+                        available: amount,
+                        locked: 0.0,
+                    });
+            }
+        }
+    }
+
+
 }
