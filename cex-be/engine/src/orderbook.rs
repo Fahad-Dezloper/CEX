@@ -17,12 +17,13 @@ pub struct OrderBookSnapshot<'a> {
     pub last_trade_id: u64,
     pub current_price: f64,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct PriceLevel {
     pub price: String,
     pub quantity: String,
 }
 
+#[derive(serde::Serialize)]
 pub struct Depth {
     pub bids: Vec<PriceLevel>,
     pub asks: Vec<PriceLevel>,

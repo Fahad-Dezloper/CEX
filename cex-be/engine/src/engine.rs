@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use crate::{orderbook::{Fill, OrderBook, PriceLevel}, types::{ProcessInput, Side}};
+use crate::{
+    orderbook::{Fill, OrderBook, PriceLevel}, redis_manager::RedisManager, types::{DepthPayload, FillResponse, MessageToApi, OpenOrdersPayload, OrderCancelledPayload, OrderPlacedPayload, ProcessInput, PushToDb, Side, ORDERUPDATEDATA, TRADEADDEDDATA}
+};
 
 pub struct UserBalance {
     available: f64,
@@ -37,17 +39,54 @@ impl Engine {
     pub fn process(&mut self, msg: ProcessInput){
         println!("wassup mf {}", msg.client_id);
         match &msg.message {
-            crate::types::MessageFromApi::CREATE_ORDER(_) => {
-                // call create order function
-                let (executed_qty, fills, order_id) = self.create_order("BTC-USD", 50000.0, 10, "buy", "user123");
+            crate::types::MessageFromApi::CREATE_ORDER(create_data) => {
+                let market = create_data.market.clone();
+                let price: f64 = create_data.price.parse().unwrap_or(0.0);
+                let quantity: u64 = create_data.quantity.parse().unwrap_or(0);
+                let side = match create_data.side {
+                    Side::Buy => "buy",
+                    Side::Sell => "sell",
+                };
+                let user_id = create_data.user_id.clone();
 
-                println!("Executed Qty: {}", executed_qty);
-                println!("Fills: {:?}", fills);
-                println!("Order ID: {}", order_id);
-                // send  to redis manager
+               match self.create_order(&market, price, quantity, side, &user_id) {
+                    Ok((executed_qty, fills, order_id)) => {
+                        let fill_responses: Vec<FillResponse> = fills.iter().map(|fill| FillResponse {
+                            price: fill.price.clone(),
+                            qty: fill.qty,
+                            trade_id: fill.trade_id,
+                            other_user_id: fill.other_user_id.clone(),
+                            market_order_id: fill.market_order_id.clone(),
+                        }).collect();
 
+                        let response = MessageToApi::ORDER_PLACED(OrderPlacedPayload {
+                            order_id: order_id.clone(),
+                            executed_qty,
+                            fills: fill_responses,
+                        });
 
-                // if error send to redis order cancelled
+                        if let Ok(json) = serde_json::to_string(&response) {
+                            if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                                let _ = redis_manager.send_to_api(&msg.client_id, &json);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Error creating order: {}", e);
+                        
+                        let response = MessageToApi::ORDER_CANCELLED(OrderCancelledPayload {
+                            order_id: "".to_string(),
+                            executed_qty: 0.0,
+                            remaining_qty: 0.0,
+                        });
+
+                        if let Ok(json) = serde_json::to_string(&response) {
+                            if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                                let _ = redis_manager.send_to_api(&msg.client_id, &json);
+                            }
+                        }
+                    }
+                }
             },
             crate::types::MessageFromApi::GET_DEPTH(_) => {
                 // handled below via if-let
@@ -58,6 +97,25 @@ impl Engine {
 
                     
                     // redis call with type DEPTH
+                    let response = match std::panic::catch_unwind(|| orderbook.getDepth()) {
+                        Ok(depth) => {
+                            MessageToApi::DEPTH(DepthPayload {
+                                payload: serde_json::to_string(&depth).unwrap_or("{\"bids\":[],\"asks\":[]}".to_string()),
+                            })
+                        }
+                        Err(e) => {
+                            println!("Error getting depth: {:?}", e);
+                            MessageToApi::DEPTH(DepthPayload {
+                                payload: "{\"bids\":[],\"asks\":[]}".to_string(),
+                            })
+                        }
+                    };
+
+                    if let Ok(json) = serde_json::to_string(&response) {
+                        if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                            let _ = redis_manager.send_to_api(&msg.client_id, &json);
+                        }
+                    }
                 }
             },
             crate::types::MessageFromApi::CANCEL_ORDER(_) => {
@@ -135,9 +193,19 @@ impl Engine {
                         }
 
                         // redis manager call type ORDER_CANCELLED else error while cancelling order
-                    println!("Cancel order: order_id = {}, market = {}", cancel_data.order_id, cancel_data.market);
-                }
-            },
+                        let response = MessageToApi::ORDER_CANCELLED(OrderCancelledPayload {
+                            order_id: order_id.to_string(),
+                            executed_qty: 0.0,
+                            remaining_qty: 0.0,
+                        });
+
+                        if let Ok(json) = serde_json::to_string(&response) {
+                            if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                                let _ = redis_manager.send_to_api(&msg.client_id, &json);
+                            }
+                        }
+                    }
+                },
             crate::types::MessageFromApi::ON_RAMP(_) => {
                 // call on ramp fuction
                 if let crate::types::MessageFromApi::ON_RAMP(ramp_data) = &msg.message {
@@ -165,8 +233,16 @@ impl Engine {
                     let open_order_book = self.orderbooks.iter().find(|o| o.ticker() == open_order_data.market).expect("Orderbook not found");
                     let open_orders = open_order_book.getOpenOrders(open_order_data.user_id.clone());
                     // redis call with type OPEN_ORDERS
-                    
-                    println!("User Id: {} Market: {}", open_order_data.user_id, open_order_data.market);
+
+                    let response = MessageToApi::OPEN_ORDERS(OpenOrdersPayload {
+                        payload: open_orders,
+                    });
+
+                    if let Ok(json) = serde_json::to_string(&response) {
+                        if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                            let _ = redis_manager.send_to_api(&msg.client_id, &json);
+                        }
+                    }
                 }
                 // send to redis
             },
@@ -181,12 +257,12 @@ impl Engine {
         quantity: u64,
         side: &str,
         user_id: &str,
-    ) -> (f64, Vec<Fill>, String) {
+    ) -> Result<(f64, Vec<Fill>, String), String> {
         let orderbook_index = match self.orderbooks
                             .iter()
                             .position(|o| o.ticker() == market) {
             Some(index) => index,
-            None => return (0.0, Vec::<Fill>::new(), "No orderbook found".to_string())
+            None => return Err("No orderbook found".to_string())
         };
 
         if let Some((base, quote)) = market.split_once('-') {
@@ -202,7 +278,7 @@ impl Engine {
         let side_enum = match side {
             "buy" => Side::Buy,
             "sell" => Side::Sell,
-            _ => return (0.0, Vec::<Fill>::new(), "Invalid side".to_string())
+            _ => return Err("Invalid side".to_string())
         };
 
         // do check and lock funds
@@ -224,7 +300,7 @@ impl Engine {
         // Extract base and quote from market string
         let (base, quote) = match market.split_once('-') {
             Some((b, q)) => (b.to_string(), q.to_string()),
-            None => return (0.0, Vec::<Fill>::new(), "Invalid market format".to_string()),
+            None => return Err("Invalid market format".to_string()),
         };
 
         let (executed_qty, fills) = self.orderbooks[orderbook_index].addOrder(order);
@@ -260,7 +336,7 @@ impl Engine {
             "Creating order: market={}, price={}, quantity={}, side={}, user_id={}",
             market, price, quantity, side, user_id
         );
-        (executed_qty, fills, new_order_id)
+        Ok((executed_qty, fills, new_order_id))
     }
 
     // check and lock funds
@@ -367,12 +443,35 @@ impl Engine {
             println!("Market Order ID: {}", fills.market_order_id);
 
             //redis manager call type trade added
+            let response = PushToDb::TRADE_ADDED(TRADEADDEDDATA {
+                market: market.to_string(),
+                id: fills.trade_id.to_string(),
+                is_buyer_maker: fills.other_user_id == user_id,
+                price: fills.price.to_string(),
+                quantity: fills.qty.to_string(),
+                quote_quantity: ((fills.qty as f64) * fills.price.parse::<f64>().unwrap_or(0.0)).to_string(),
+                timestamp: chrono::Utc::now().timestamp(),
+            });
+
+            if let Ok(json) = serde_json::to_string(&response) {
+                if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                    let _ = redis_manager.push_db(&json);
+                }
+            }
         })
     }
 
     pub fn update_db_trades(&mut self, order: Order, executed_qty: f64, fills: Vec<Fill>, market: String, user_id: String) {
 
         //redis manager call type ORDER_UPDATE here too
+        let response = PushToDb::ORDER_UPDATE(ORDERUPDATEDATA {
+            order_id: order.order_id.clone(),
+            exec_qty: executed_qty,
+            market: Some(market.to_string()),
+            price: Some(order.price.to_string()),
+            quantity: Some(order.quantity.to_string()),
+            side: Some(order.side),
+        });
 
 
         //TODO: implement
@@ -389,6 +488,14 @@ impl Engine {
 
 
             //redis manager call type ORDER_UPDATE
+            let response = PushToDb::ORDER_UPDATE(ORDERUPDATEDATA {
+                order_id: fill.market_order_id.clone(),
+                exec_qty: fill.qty as f64,
+                market: None,
+                price: None,
+                quantity: None,
+                side: None,
+            });
 
 
         })

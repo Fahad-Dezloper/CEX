@@ -94,4 +94,12 @@ impl RedisManager {
         Ok(())
     }
 
+    /// Send message back to API via Redis
+    pub fn send_to_api(&self, client_id: &str, message: &str) -> RedisResult<()> {
+        let mut conn = self.redis_client.get_connection()?;
+        let channel = format!("api_response:{}", client_id);
+        redis::cmd("PUBLISH").arg(channel).arg(message).execute(&mut conn);
+        Ok(())
+    }
+
 }
