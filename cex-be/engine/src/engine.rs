@@ -502,15 +502,25 @@ impl Engine {
     }
 
     pub fn publish_ws_trades(&mut self, fills: Vec<Fill>, user_id: String, market: String) {
-        fills.iter().for_each(|fills| {
-            println!("Trade ID: {}", fills.trade_id);
-            println!("Price: {}", fills.price);
-            println!("Qty: {}", fills.qty);
-            println!("Other User ID: {}", fills.other_user_id);
-            println!("Market Order ID: {}", fills.market_order_id);
-            
+        fills.iter().for_each(|fill| {
+            let channel = format!("trade@{}", market);
+            let trade_data = serde_json::json!({
+                "stream": format!("trade@{}", market),
+                "data": {
+                    "e": "trade",
+                    "t": fill.trade_id,
+                    "m": fill.other_user_id == user_id,
+                    "p": fill.price,
+                    "q": fill.qty.to_string(),
+                    "s": market,
+                }
+            });
 
-            // make redis manager call publishMessage
+            if let Ok(json) = serde_json::to_string(&trade_data) {
+                if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                    let _ = redis_manager.publish_ws(&channel, &json);
+                }
+            }
         })
     }
 
@@ -532,17 +542,47 @@ impl Engine {
             let updated_asks: Vec<&PriceLevel> = depth.asks.iter()
                 .filter(|ask| fill_prices.contains(&ask.price))
                 .collect();
-            let updated_bid = depth.bids.iter().find(|bid| bid.price == price.to_string());
+            let updated_bids = depth.bids.iter().find(|bid| bid.price == price.to_string());
 
             // redis manager call publishMessage
+            let channel = format!("depth@{}", market);
+            let depth_data = serde_json::json!({
+                "stream": format!("depth@{}", market),
+                "data": {
+                    "a": updated_asks,
+                    "b": updated_bids.map_or_else(|| serde_json::Value::Array(vec![]), |bid| serde_json::json!([bid])),
+                    "e": "depth",
+                }
+            });
+
+            if let Ok(json) = serde_json::to_string(&depth_data) {
+                if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                    let _ = redis_manager.publish_ws(&channel, &json);
+                }
+            }
         } else {
             let fill_prices: Vec<String> = fills.iter().map(|f| f.price.to_string()).collect();
             let updated_bids: Vec<&PriceLevel> = depth.bids.iter()
                 .filter(|bid| fill_prices.contains(&bid.price))
                 .collect();
-            let updated_ask = depth.asks.iter().find(|ask| ask.price == price.to_string());
+            let updated_asks = depth.asks.iter().find(|ask| ask.price == price.to_string());
 
             // redis manager call publishMessage
+            let channel = format!("depth@{}", market);
+            let depth_data = serde_json::json!({
+                "stream": format!("depth@{}", market),
+                "data": {
+                    "a": updated_asks.map_or_else(|| serde_json::Value::Array(vec![]), |ask| serde_json::json!([ask])),
+                    "b": updated_bids,
+                    "e": "depth",
+                }
+            });
+
+            if let Ok(json) = serde_json::to_string(&depth_data) {
+                if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                    let _ = redis_manager.publish_ws(&channel, &json);
+                }
+            }
         }
 
         // make redis manager call publishMessage
