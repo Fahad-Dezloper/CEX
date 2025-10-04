@@ -1,8 +1,9 @@
 use bigdecimal::BigDecimal;
 use chrono::{NaiveDate, NaiveDateTime};
-use diesel::prelude::Queryable;
+use diesel::prelude::{Queryable, Insertable};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::schema::{trades, orders};
 
 #[derive(Debug, Queryable, Serialize, Deserialize)]
 #[diesel(table_name = users)]
@@ -15,7 +16,7 @@ pub struct User {
     pub updated_at: NaiveDate,
 }
 
-#[derive(Debug, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = trades)]
 pub struct Trade {
     pub id: Uuid,
@@ -27,7 +28,7 @@ pub struct Trade {
     pub market: String
 }
 
-#[derive(Debug, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = orders)]
 pub struct Order {
     pub id: Uuid,
