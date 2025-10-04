@@ -584,8 +584,6 @@ impl Engine {
                 }
             }
         }
-
-        // make redis manager call publishMessage
     }
 
     pub fn send_updated_depth(&mut self, price: String, market: String) {
@@ -604,6 +602,34 @@ impl Engine {
             .collect();
             
         // redis manager call publishMessage
+        let channel = format!("depth@{}", market);
+        let depth_data = serde_json::json!({
+            "stream": format!("depth@{}", market),
+            "data": {
+                "a": if updated_asks.len() > 0 {
+                    serde_json::to_value(
+                        updated_asks.iter().map(|ask| vec![ask.price.clone(), ask.quantity.clone()]).collect::<Vec<_>>()
+                    ).unwrap()
+                } else {
+                    serde_json::json!([[price.clone(), "0"]])
+                },
+                "b": if updated_bids.len() > 0 {
+                    serde_json::to_value(
+                        updated_bids.iter().map(|bid| vec![bid.price.clone(), bid.quantity.clone()]).collect::<Vec<_>>()
+                    ).unwrap()
+                } else {
+                    serde_json::json!([[price.clone(), "0"]])
+                },
+                "e": "depth",
+            }
+        });
+
+        if let Ok(json) = serde_json::to_string(&depth_data) {
+            if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                let _ = redis_manager.publish_ws(&channel, &json);
+            }
+        }
+
     }
 
     pub fn on_ramp(&mut self, user_id: String, amount: f64) {
