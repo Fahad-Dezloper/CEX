@@ -1,0 +1,9 @@
+couple of diffrent services.
+
+build it from first principle
+
+start with ws connect with frontend
+
+complete it be smart than others
+
+next work on main-engine

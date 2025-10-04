@@ -6,7 +6,7 @@ use crate::{redismanager::RedisManager, types::{DepthQuery, EngineData, MessageT
 #[handler]
 async fn depth_order(
     Data(manager): Data<&Arc<RedisManager>>,
-    Query(query): Query<DepthQuery>,
+    Query(query): Query<DepthQuery>, // depth query is SOL - USDC [Asset - Quote]
 ) -> poem::Result<Json<String>> {
     let response = manager
         .send_and_await(MessageToEngine {

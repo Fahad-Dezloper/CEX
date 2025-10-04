@@ -1,35 +1,28 @@
-use redis::Commands;
-use std::thread::sleep;
-use std::time::Duration;
+use redis::RedisResult;
+use crate::{engine::Engine, redis_manager::RedisManager};
+use serde_json;
 
-use crate::main_engine::Enginee;
-use crate::types::Process;
-mod main_engine;
 mod types;
+mod engine;
+mod redis_manager;
 mod orderbook;
-mod redis;
 
+fn main() -> RedisResult<()> {
+    let mut engine = Engine::new();
+    println!("Engine initialized");
 
-fn main() {
-    let engine: Enginee = Enginee::new();
-
-    let client = redis::Client::open("redis://127.0.0.1/").expect("failed to create Redis client");
-    let mut conn = client
-        .get_connection()
-        .expect("failed to get Redis connection");
-    println!("Connected to Redis");
+    let redis_manager = RedisManager::new();
+    println!("Redis manager initialized");
 
     loop {
-        let response: redis::RedisResult<Option<String>> = conn.rpop("message", None);
+        if let Ok(Some(msg)) = redis_manager.pop_message() {
+            println!("Received message: {}", msg);
 
-        if let Ok(Some(resp)) = response {
-            match serde_json::from_str::<Process>(&resp) {
-                Ok(json) => engine.process(json),
-                Err(err) => eprintln!("Json Parse err {}", err)
-            }
-        } else {
-            sleep(Duration::from_millis(100));
+            // Deserialize incoming order
+            let order = serde_json::from_str(&msg).unwrap();
+
+            // Process order inside engine
+            engine.process(order);
         }
-        
     }
 }
