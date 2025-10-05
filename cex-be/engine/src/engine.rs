@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use uuid::Uuid;
+use log::{info, warn, error, debug};
 
 use crate::{
     orderbook::{Fill, OrderBook, PriceLevel}, redis_manager::RedisManager, types::{DepthPayload, FillResponse, MessageToApi, OpenOrdersPayload, OrderCancelledPayload, OrderPlacedPayload, ProcessInput, PushToDb, Side, ORDERUPDATEDATA, TRADEADDEDDATA}
@@ -29,15 +30,50 @@ pub struct Order {
 
 impl Engine { 
     pub fn new() -> Self {
-        println!("wassup my man");
-        Self {
+        println!("Initializing matching engine...");
+        let mut engine = Self {
             orderbooks: Vec::new(),
             balances: HashMap::new()
+        };
+        
+        // Initialize orderbooks for supported markets
+        engine.initialize_markets();
+        
+        println!("Matching engine initialized with {} markets", engine.orderbooks.len());
+        engine
+    }
+
+    fn initialize_markets(&mut self) {
+        let supported_markets = vec![
+            ("BTC", "USD"),
+            ("ETH", "USD"),
+            ("BTC", "USDT"),
+            ("ETH", "USDT"),
+            ("SOL", "USD"),
+            ("ADA", "USD"),
+            ("DOT", "USD"),
+            ("MATIC", "USD"),
+            ("AVAX", "USD"),
+            ("LINK", "USD"),
+        ];
+
+        for (base_asset, quote_asset) in supported_markets {
+            let orderbook = OrderBook::new(
+                base_asset.to_string(),
+                quote_asset.to_string(),
+                Vec::new(),
+                Vec::new(),
+                Some(0),    
+                Some(0.0),  
+            );
+            
+            println!("Initialized orderbook for {}-{}", base_asset, quote_asset);
+            self.orderbooks.push(orderbook);
         }
     }
 
     pub fn process(&mut self, msg: ProcessInput){
-        println!("wassup mf {}", msg.client_id);
+        debug!("Processing message from client: {}", msg.client_id);
         match &msg.message {
             crate::types::MessageFromApi::CREATE_ORDER(create_data) => {
                 let market = create_data.market.clone();
@@ -89,14 +125,12 @@ impl Engine {
                 }
             },
             crate::types::MessageFromApi::GET_DEPTH(_) => {
-                // handled below via if-let
                 if let crate::types::MessageFromApi::GET_DEPTH(depth_data) = &msg.message {
                     println!("Market: {}", depth_data.market);
                     let market = depth_data.market.clone();
                     let orderbook = self.orderbooks.iter().find(|o| o.ticker() == market).expect("Orderbook not found");
 
                     
-                    // redis call with type DEPTH
                     let response = match std::panic::catch_unwind(|| orderbook.getDepth()) {
                         Ok(depth) => {
                             MessageToApi::DEPTH(DepthPayload {
@@ -119,7 +153,6 @@ impl Engine {
                 }
             },
             crate::types::MessageFromApi::CANCEL_ORDER(_) => {
-                // cancel order function
                 if let crate::types::MessageFromApi::CANCEL_ORDER(cancel_data) = &msg.message {
                     let order_id = &cancel_data.order_id;
                     let cancel_market = &cancel_data.market;
@@ -192,7 +225,6 @@ impl Engine {
                             println!("Order not found: {}", order_id);
                         }
 
-                        // redis manager call type ORDER_CANCELLED else error while cancelling order
                         let response = MessageToApi::ORDER_CANCELLED(OrderCancelledPayload {
                             order_id: order_id.to_string(),
                             executed_qty: 0.0,
@@ -207,7 +239,6 @@ impl Engine {
                     }
                 },
             crate::types::MessageFromApi::ON_RAMP(_) => {
-                // call on ramp fuction
                 if let crate::types::MessageFromApi::ON_RAMP(ramp_data) = &msg.message {
                     println!("Ramp data Amount: {}, user_id: {}, txn_id: {}", ramp_data.amount, ramp_data.user_id, ramp_data.txn_id);
 
@@ -222,17 +253,14 @@ impl Engine {
 
                     self.on_ramp(user_id, amount);
                 }
-                // get orderbook depth and send to redis
                 if let crate::types::MessageFromApi::GET_DEPTH(depth_data) = &msg.message {
                     println!("Market: {}", depth_data.market)
                 }
             },
             crate::types::MessageFromApi::GET_OPEN_ORDERS(_) => {
-                // get open orders
                 if let crate::types::MessageFromApi::GET_OPEN_ORDERS(open_order_data) = &msg.message {
                     let open_order_book = self.orderbooks.iter().find(|o| o.ticker() == open_order_data.market).expect("Orderbook not found");
                     let open_orders = open_order_book.getOpenOrders(open_order_data.user_id.clone());
-                    // redis call with type OPEN_ORDERS
 
                     let response = MessageToApi::OPEN_ORDERS(OpenOrdersPayload {
                         payload: open_orders,
@@ -244,7 +272,6 @@ impl Engine {
                         }
                     }
                 }
-                // send to redis
             },
         };
         println!("wassup");
@@ -266,8 +293,8 @@ impl Engine {
         };
 
         if let Some((base, quote)) = market.split_once('-') {
-            println!("Base: {}", base);   // BTC
-            println!("Quote: {}", quote); // USD
+            println!("Base: {}", base);   // ex: BTC
+            println!("Quote: {}", quote); // ex: USD
 
             let btc = base.to_string();
             let usd = quote.to_string();
@@ -584,8 +611,6 @@ impl Engine {
                 }
             }
         }
-
-        // make redis manager call publishMessage
     }
 
     pub fn send_updated_depth(&mut self, price: String, market: String) {
@@ -604,6 +629,34 @@ impl Engine {
             .collect();
             
         // redis manager call publishMessage
+        let channel = format!("depth@{}", market);
+        let depth_data = serde_json::json!({
+            "stream": format!("depth@{}", market),
+            "data": {
+                "a": if updated_asks.len() > 0 {
+                    serde_json::to_value(
+                        updated_asks.iter().map(|ask| vec![ask.price.clone(), ask.quantity.clone()]).collect::<Vec<_>>()
+                    ).unwrap()
+                } else {
+                    serde_json::json!([[price.clone(), "0"]])
+                },
+                "b": if updated_bids.len() > 0 {
+                    serde_json::to_value(
+                        updated_bids.iter().map(|bid| vec![bid.price.clone(), bid.quantity.clone()]).collect::<Vec<_>>()
+                    ).unwrap()
+                } else {
+                    serde_json::json!([[price.clone(), "0"]])
+                },
+                "e": "depth",
+            }
+        });
+
+        if let Ok(json) = serde_json::to_string(&depth_data) {
+            if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+                let _ = redis_manager.publish_ws(&channel, &json);
+            }
+        }
+
     }
 
     pub fn on_ramp(&mut self, user_id: String, amount: f64) {

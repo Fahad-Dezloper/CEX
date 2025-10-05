@@ -40,7 +40,7 @@ pub struct Fill {
 
 
 impl OrderBook {
-    fn new(
+    pub fn new(
         base_asset: String,
         quote_asset: String,
         bids: Vec<Order>,

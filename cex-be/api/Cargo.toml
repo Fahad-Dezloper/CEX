@@ -14,3 +14,15 @@ futures-util = "0.3"
 time = { version = "0.3.41", features = ["serde"] }
 postgres = "0.19.10"
 tokio-postgres = "0.7.13"
+db = { path = "../db" }
+diesel = { version = "2.2.0", features = ["postgres", "uuid", "chrono", "r2d2", "numeric"] }
+dotenvy = "0.15"
+bigdecimal = { version = "0.4.7", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "9.2"
+bcrypt = "0.15"
+validator = { version = "0.18", features = ["derive"] }
+log = "0.4"
+env_logger = "0.11"
+url = "2.5"
+anyhow = "1.0"

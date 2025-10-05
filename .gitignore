@@ -8,3 +8,6 @@ cex-be/ws/cargo.lock
 cex-be/engine/target
 cex-be/engine/Cargo.lock
 cex-be/ws/target
+cex-be/db/target
+cex-be/target
+cex-be/Cargo.lock
