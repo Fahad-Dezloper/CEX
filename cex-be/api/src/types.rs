@@ -1,21 +1,24 @@
 use serde::{Deserialize, Serialize};
 use time::Time;
+use validator::Validate;
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")] 
 pub enum Side {
     Buy,
     Sell
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateOrder {
+    #[validate(length(min = 7, max = 20))]
     pub market: String,
+    #[validate(range(min = 0.01))]
     pub price: f64,
+    #[validate(range(min = 0.00000001))]
     pub quantity: f64,
     pub side: Side,
-    pub user_id: String
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,9 +39,9 @@ pub struct KlinesQuery {
     pub market: String,
     pub interval: String,
     #[serde(rename = "startTime")]
-    pub start_time: Time,
+    pub start_time: i64,
     #[serde(rename = "endTime")]
-    pub end_time: Time
+    pub end_time: i64
 }
 
 

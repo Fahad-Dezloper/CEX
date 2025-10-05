@@ -3,9 +3,9 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::{Queryable, Insertable};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::schema::{trades, orders};
+use crate::schema::{trades, orders, users};
 
-#[derive(Debug, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = users)]
 pub struct User {
     pub id: Uuid,
