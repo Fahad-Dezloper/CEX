@@ -22,7 +22,6 @@ async fn main() -> Result<(), std::io::Error> {
     
     log::info!("Starting CEX API server...");
 
-    // Load environment variables
     dotenvy::dotenv().ok();
 
     let manager = RedisManager::new("redis://127.0.0.1/")
@@ -44,9 +43,9 @@ async fn main() -> Result<(), std::io::Error> {
                     .data(manager);
 
     log::info!("API routes configured");
-    log::info!("Server starting on 0.0.0.0:3000");
+    log::info!("Server starting on 0.0.0.0:3010");
 
-    Server::new(TcpListener::bind("0.0.0.0:3000"))
+    Server::new(TcpListener::bind("0.0.0.0:3010"))
         .run(app)
         .await
 }

@@ -1,4 +1,5 @@
-use poem::{handler, post, web::Json, Route, Result, error::InternalServerError};
+use poem::{handler, post, web::Json, Route, Result, error::InternalServerError, IntoResponse, Response};
+use poem::http::header;
 use serde_json::json;
 use validator::Validate;
 use db::{establish_connection, User as DbUser, users};
@@ -6,48 +7,50 @@ use diesel::prelude::*;
 use crate::auth_service::{AuthService, LoginRequest, RegisterRequest, UserInfo};
 
 #[handler]
-async fn register(Json(payload): Json<RegisterRequest>) -> Result<Json<serde_json::Value>> {
+async fn register(Json(payload): Json<RegisterRequest>) -> Result<Response> {
+    log::info!("Registering user: {:?}", payload);
     if let Err(validation_errors) = payload.validate() {
         return Ok(Json(json!({
             "error": "Validation failed",
             "details": validation_errors.field_errors()
-        })));
+        })).into_response());
     }
+    log::info!("Validation passed");
 
     let pool = establish_connection();
     let mut conn = pool.get()
         .map_err(|e| poem::Error::from_string(format!("Database connection error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
-
+    log::info!("Database connection established");
     let existing_user: Option<DbUser> = users::table
         .filter(users::email.eq(&payload.email))
         .first(&mut conn)
         .optional()
         .map_err(|e| poem::Error::from_string(format!("Database query error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
-
+    log::info!("Database query executed");
     if existing_user.is_some() {
         return Ok(Json(json!({
             "error": "User with this email already exists"
-        })));
+        })).into_response());
     }
-
+    log::info!("User with this email does not exist");
     let existing_username: Option<DbUser> = users::table
         .filter(users::username.eq(&payload.username))
         .first(&mut conn)
         .optional()
         .map_err(|e| poem::Error::from_string(format!("Database query error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
-
+    log::info!("Database query executed");
     if existing_username.is_some() {
         return Ok(Json(json!({
             "error": "Username already taken"
-        })));
+        })).into_response());
     }
-
+    log::info!("User with this username does not exist");
     let new_user = crate::auth_service::User::new(
         payload.username,
         payload.email,
         payload.password,
     ).map_err(|e| poem::Error::from_string(format!("Password hashing error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
-
+    log::info!("User created");
     let db_user = DbUser {
         id: new_user.id,
         username: new_user.username.clone(),
@@ -56,7 +59,7 @@ async fn register(Json(payload): Json<RegisterRequest>) -> Result<Json<serde_jso
         created_at: new_user.created_at.date(),
         updated_at: new_user.created_at.date(),
     };
-
+    log::info!("Database user created");
     diesel::insert_into(users::table)
         .values(&db_user)
         .execute(&mut conn)
@@ -75,21 +78,31 @@ async fn register(Json(payload): Json<RegisterRequest>) -> Result<Json<serde_jso
         username: new_user.username,
     };
 
-    Ok(Json(json!({
+    // Set HttpOnly cookie for session
+    let cookie = format!(
+        "cex_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
+        token,
+        60 * 60 * 24
+    );
+
+    let body = json!({
         "message": "User registered successfully",
-        "token": token,
         "user": user_info
-    })))
+    });
+    let mut resp = Json(body).into_response();
+    resp.headers_mut().insert(header::SET_COOKIE, header::HeaderValue::from_str(&cookie).unwrap());
+    Ok(resp)
 }
 
 #[handler]
-async fn login(Json(payload): Json<LoginRequest>) -> Result<Json<serde_json::Value>> {
+async fn login(Json(payload): Json<LoginRequest>) -> Result<Response> {
     if let Err(validation_errors) = payload.validate() {
         return Ok(Json(json!({
             "error": "Validation failed",
             "details": validation_errors.field_errors()
-        })));
+        })).into_response());
     }
+    log::info!("Validation passed");
 
     let pool = establish_connection();
     let mut conn = pool.get()
@@ -101,37 +114,47 @@ async fn login(Json(payload): Json<LoginRequest>) -> Result<Json<serde_json::Val
         .optional()
         .map_err(|e| poem::Error::from_string(format!("Database query error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
+    log::info!("Database query executed");
     let user = match user {
         Some(user) => user,
         None => {
             return Ok(Json(json!({
                 "error": "Invalid email or password"
-            })));
+            })).into_response());
         }
     };
-
+    log::info!("User found");
     let auth_service = AuthService::new();
     if !AuthService::verify_password(&payload.password, &user.password_hash)
         .map_err(|e| poem::Error::from_string(format!("Password verification error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))? {
         return Ok(Json(json!({
             "error": "Invalid email or password"
-        })));
+        })).into_response());
     }
-
+    log::info!("Password verified");
     let token = auth_service.generate_token(&user.id.to_string(), &user.email)
         .map_err(|e| poem::Error::from_string(format!("Token generation error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
-
+    log::info!("Token generated");
     let user_info = UserInfo {
         id: user.id.to_string(),
         email: user.email,
         username: user.username,
     };
+    log::info!("User info created");
+    // Set HttpOnly cookie for session
+    let cookie = format!(
+        "cex_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
+        token,
+        60 * 60 * 24
+    );
 
-    Ok(Json(json!({
+    let body = json!({
         "message": "Login successful",
-        "token": token,
         "user": user_info
-    })))
+    });
+    let mut resp = Json(body).into_response();
+    resp.headers_mut().insert(header::SET_COOKIE, header::HeaderValue::from_str(&cookie).unwrap());
+    Ok(resp)
 }
 
 fn initialize_user_wallet(user_id: &str, conn: &mut diesel::PgConnection) -> Result<(), poem::Error> {
