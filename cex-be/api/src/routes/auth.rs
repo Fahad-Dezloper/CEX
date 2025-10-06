@@ -1,10 +1,13 @@
+use poem::get;
 use poem::{handler, post, web::Json, Route, Result, error::InternalServerError, IntoResponse, Response};
 use poem::http::header;
 use serde_json::json;
+use uuid::Uuid;
 use validator::Validate;
 use db::{establish_connection, User as DbUser, users};
 use diesel::prelude::*;
 use crate::auth_service::{AuthService, LoginRequest, RegisterRequest, UserInfo};
+use crate::middleware::extract_claims;
 
 #[handler]
 async fn register(Json(payload): Json<RegisterRequest>) -> Result<Response> {
@@ -123,7 +126,7 @@ async fn login(Json(payload): Json<LoginRequest>) -> Result<Response> {
             })).into_response());
         }
     };
-    log::info!("User found");
+    println!("user: {:?}", user);
     let auth_service = AuthService::new();
     if !AuthService::verify_password(&payload.password, &user.password_hash)
         .map_err(|e| poem::Error::from_string(format!("Password verification error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))? {
@@ -141,7 +144,6 @@ async fn login(Json(payload): Json<LoginRequest>) -> Result<Response> {
         username: user.username,
     };
     log::info!("User info created");
-    // Set HttpOnly cookie for session
     let cookie = format!(
         "cex_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
         token,
@@ -152,6 +154,7 @@ async fn login(Json(payload): Json<LoginRequest>) -> Result<Response> {
         "message": "Login successful",
         "user": user_info
     });
+    println!("body: {:?}", body);
     let mut resp = Json(body).into_response();
     resp.headers_mut().insert(header::SET_COOKIE, header::HeaderValue::from_str(&cookie).unwrap());
     Ok(resp)
@@ -172,8 +175,74 @@ fn initialize_user_wallet(user_id: &str, conn: &mut diesel::PgConnection) -> Res
     Ok(())
 }
 
+#[handler]
+pub async fn me(request: &poem::Request) -> Result<Response> {
+    log::info!("/auth/me called");
+    let bearer = request
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .map(|s| s.to_string());
+
+    let cookie_token = request
+        .headers()
+        .get(poem::http::header::COOKIE)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|c| c.split(';').map(|kv| kv.trim()).find_map(|kv| kv.strip_prefix("cex_token=")))
+        .map(|s| s.to_string());
+
+    let token = bearer.or(cookie_token)
+        .ok_or_else(|| poem::Error::from_string("Authentication required", poem::http::StatusCode::UNAUTHORIZED))?;
+
+    let claims = AuthService::new()
+        .verify_token(&token)
+        .map_err(|_| poem::Error::from_string("Invalid or expired token", poem::http::StatusCode::UNAUTHORIZED))?;
+    log::info!("Token verified");
+    let pool = establish_connection();
+    let mut conn = pool.get()
+        .map_err(|e| poem::Error::from_string(format!("Database connection error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+
+    let user_id = Uuid::parse_str(&claims.user_id)
+        .map_err(|e| poem::Error::from_string(format!("Invalid user ID: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+    log::info!("User ID parsed");
+    let user = users::table
+        .filter(users::id.eq(user_id))
+        .first::<DbUser>(&mut conn)
+        .optional()
+        .map_err(|e| poem::Error::from_string(format!("Database query error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+    log::info!("Database query executed");
+    let user: Option<DbUser> = match user {
+        Some(user) => Some(user),
+        None => return Ok(Json(json!({
+            "error": "User not found"
+        })).into_response()),
+    };
+    log::info!("User found");
+    let user = user.unwrap();
+    let user_info = UserInfo {
+        id: user.id.to_string(),
+        email: user.email,
+        username: user.username,
+    };
+    log::info!("User info created");
+    Ok(Json(json!({
+        "user": user_info
+    })).into_response())
+}
+
+#[handler]
+async fn logout() -> Result<Response> {
+    let mut resp = Json(json!({ "message": "Logged out" })).into_response();
+    let clear = "cex_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0";
+    resp.headers_mut().insert(header::SET_COOKIE, header::HeaderValue::from_static(clear));
+    Ok(resp)
+}
+
 pub fn auth_routes() -> Route {
     Route::new()
         .at("/register", post(register))
         .at("/login", post(login))
+        .at("/logout", post(logout))
+        .at("/me", get(me))
 }

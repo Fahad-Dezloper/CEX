@@ -1,0 +1,5 @@
+get markets
+
+create trade page improved UI
+
+improve it everyday understand the click to queue flow

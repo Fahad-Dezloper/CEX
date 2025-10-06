@@ -30,6 +30,13 @@ async fn main() -> Result<(), std::io::Error> {
 
     log::info!("Connected to Redis successfully");
 
+    let cors = Cors::new()
+        .allow_origin("http://localhost:3000")
+        .allow_credentials(true)
+        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        .allow_headers(vec!["content-type", "authorization"]);
+
+
     let app = Route::new()
                     // Public routes (no authentication required)
                     .nest("/api/v1/auth", auth::auth_routes())
@@ -39,7 +46,7 @@ async fn main() -> Result<(), std::io::Error> {
                     .nest("/api/v1/tickers", ticker::ticker_routes())
                     // Protected routes (authentication required)
                     .nest("/api/v1/order", order::order_routes())
-                    .with(Cors::new())
+                    .with(cors)
                     .data(manager);
 
     log::info!("API routes configured");
