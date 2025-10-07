@@ -4,10 +4,12 @@ use poem::http::header;
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
-use db::{establish_connection, User as DbUser, users};
+use db::{establish_connection, user_assets, users, User as DbUser, UserAsset};
 use diesel::prelude::*;
 use crate::auth_service::{AuthService, LoginRequest, RegisterRequest, UserInfo};
 use crate::middleware::extract_claims;
+use diesel::dsl::sql;
+use diesel::prelude::*;
 
 #[handler]
 async fn register(Json(payload): Json<RegisterRequest>) -> Result<Response> {
@@ -68,8 +70,8 @@ async fn register(Json(payload): Json<RegisterRequest>) -> Result<Response> {
         .execute(&mut conn)
         .map_err(|e| poem::Error::from_string(format!("Database insert error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    // Initialize user wallet with $10000 USD
-    initialize_user_wallet(&new_user.id.to_string(), &mut conn)?;
+    // Initialize user assets with 10,000 USDC in user_assets table
+    initialize_user_wallet(new_user.id, &mut conn)?;
 
     let auth_service = AuthService::new();
     let token = auth_service.generate_token(&new_user.id.to_string(), &new_user.email)
@@ -79,9 +81,9 @@ async fn register(Json(payload): Json<RegisterRequest>) -> Result<Response> {
         id: new_user.id.to_string(),
         email: new_user.email,
         username: new_user.username,
+        assets: vec![],
     };
 
-    // Set HttpOnly cookie for session
     let cookie = format!(
         "cex_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
         token,
@@ -142,6 +144,7 @@ async fn login(Json(payload): Json<LoginRequest>) -> Result<Response> {
         id: user.id.to_string(),
         email: user.email,
         username: user.username,
+        assets: vec![],
     };
     log::info!("User info created");
     let cookie = format!(
@@ -160,18 +163,20 @@ async fn login(Json(payload): Json<LoginRequest>) -> Result<Response> {
     Ok(resp)
 }
 
-fn initialize_user_wallet(user_id: &str, conn: &mut diesel::PgConnection) -> Result<(), poem::Error> {
-    // Initialize user with $10000 USD balance
-    log::info!("Initializing wallet for user {} with $10000 USD", user_id);
-    
-    // For now, we'll send an on_ramp message to the engine to initialize the wallet
-    // In a production system, you'd want to store balances in the database
-    // and sync with the engine
-    
-    // TODO: Implement proper balance persistence in database
-    // For now, the engine will handle wallet initialization via on_ramp
-    
-    log::info!("Wallet initialization completed for user: {}", user_id);
+fn initialize_user_wallet(user_id: Uuid, conn: &mut diesel::PgConnection) -> Result<(), poem::Error> {
+    log::info!("Initializing user_assets for user {} with 10000 USDC", user_id);
+    diesel::insert_into(user_assets::table)
+        .values((
+            user_assets::user_id.eq(user_id),
+            user_assets::symbol.eq("USDC"),
+            user_assets::amount.eq(10000.0f64),
+        ))
+        .on_conflict((user_assets::user_id, user_assets::symbol))
+        .do_update()
+        .set(user_assets::amount.eq(10000.0f64))
+        .execute(conn)
+        .map_err(|e| poem::Error::from_string(format!("Failed to seed user_assets: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+
     Ok(())
 }
 
@@ -218,12 +223,18 @@ pub async fn me(request: &poem::Request) -> Result<Response> {
             "error": "User not found"
         })).into_response()),
     };
-    log::info!("User found");
+    log::info!("User found: {:?}", user);
     let user = user.unwrap();
+    let user_assets = user_assets::table
+        .filter(user_assets::user_id.eq(&user.id))
+        .load::<UserAsset>(&mut conn)
+        .map_err(|e| poem::Error::from_string(format!("Database query error: {}", e), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+    log::info!("User assets found: {:?}", &user_assets);
     let user_info = UserInfo {
         id: user.id.to_string(),
-        email: user.email,
+        email: user.email,  
         username: user.username,
+        assets: user_assets.clone(),
     };
     log::info!("User info created");
     Ok(Json(json!({

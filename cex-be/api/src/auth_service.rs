@@ -42,6 +42,7 @@ pub struct UserInfo {
     pub id: String,
     pub email: String,
     pub username: String,
+    pub assets: Vec<db::UserAsset>,
 }
 
 pub struct AuthService {
@@ -130,6 +131,7 @@ impl User {
             id: self.id.to_string(),
             email: self.email.clone(),
             username: self.username.clone(),
+            assets: vec![],
         }
     }
 }

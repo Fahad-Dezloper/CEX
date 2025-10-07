@@ -113,3 +113,43 @@ SQL
 echo "[clear_data] Done. Redis is empty and Postgres tables are truncated; schema and extensions preserved."
 
 
+
+# Apply schema for markets table (idempotent) and seed enabled markets
+echo "[clear_data] Ensuring markets schema exists and seeding default markets..."
+docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" -i "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'SQL'
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS markets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    base_asset VARCHAR(16) NOT NULL,
+    quote_asset VARCHAR(16) NOT NULL,
+    symbol VARCHAR(64) NOT NULL UNIQUE,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    price_precision INTEGER NOT NULL DEFAULT 2,
+    quantity_precision INTEGER NOT NULL DEFAULT 6,
+    min_price DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    max_price DOUBLE PRECISION NOT NULL DEFAULT 1000000000,
+    min_order_size DOUBLE PRECISION NOT NULL DEFAULT 0.000001,
+    max_order_size DOUBLE PRECISION NOT NULL DEFAULT 1000000000
+);
+
+-- Seed default enabled markets (idempotent)
+INSERT INTO markets (base_asset, quote_asset, symbol, enabled, price_precision, quantity_precision, min_price, max_price, min_order_size, max_order_size) VALUES
+ ('BTC','USDC','BTC-USDC', TRUE, 2, 8, 0.01, 1000000, 0.001, 100.0),
+ ('ETH','USDC','ETH-USDC', TRUE, 2, 6, 0.01, 100000, 0.01, 1000.0),
+ ('SOL','USDC','SOL-USDC', TRUE, 4, 4, 0.0001, 1000, 0.1, 10000.0),
+ ('BNB','USDC','BNB-USDC', TRUE, 2, 6, 0.01, 100000, 0.01, 1000.0),
+ ('DOGECOIN','USDC','DOGECOIN-USDC', TRUE, 4, 4, 0.0001, 1000, 1.0, 1000000.0),
+ ('SUI','USDC','SUI-USDC', TRUE, 4, 4, 0.0001, 1000, 0.1, 100000.0),
+ ('HYPERLIQUID','USDC','HYPERLIQUID-USDC', TRUE, 4, 4, 0.0001, 1000, 0.1, 100000.0)
+ON CONFLICT (symbol) DO UPDATE SET
+  enabled = EXCLUDED.enabled,
+  price_precision = EXCLUDED.price_precision,
+  quantity_precision = EXCLUDED.quantity_precision,
+  min_price = EXCLUDED.min_price,
+  max_price = EXCLUDED.max_price,
+  min_order_size = EXCLUDED.min_order_size,
+  max_order_size = EXCLUDED.max_order_size;
+SQL
+
+echo "[clear_data] Markets schema ensured and defaults seeded. API will cache them to Redis on startup."
