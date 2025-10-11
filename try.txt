@@ -1,4 +1,4 @@
-get markets
+get markets - done
 
 create trade page improved UI
 
