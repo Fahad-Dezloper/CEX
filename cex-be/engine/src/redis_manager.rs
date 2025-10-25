@@ -102,4 +102,9 @@ impl RedisManager {
         Ok(())
     }
 
+    pub fn get_cached_markets(&self) -> RedisResult<Option<String>> {
+        let mut conn = self.redis_client.get_connection()?;
+        let val: Option<String> = redis::cmd("GET").arg("markets:list").query(&mut conn).ok();
+        Ok(val)
+    }
 }

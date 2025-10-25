@@ -44,31 +44,46 @@ impl Engine {
     }
 
     fn initialize_markets(&mut self) {
-        let supported_markets = vec![
-            ("BTC", "USD"),
-            ("ETH", "USD"),
-            ("BTC", "USDT"),
-            ("ETH", "USDT"),
-            ("SOL", "USD"),
-            ("ADA", "USD"),
-            ("DOT", "USD"),
-            ("MATIC", "USD"),
-            ("AVAX", "USD"),
-            ("LINK", "USD"),
-        ];
+        let mut initialized = false;
+        if let Some(redis_manager) = RedisManager::get_instance().try_lock() {
+            if let Ok(Some(json)) = redis_manager.get_cached_markets() {
+                if let Ok(markets) = serde_json::from_str::<Vec<serde_json::Value>>(&json) {
+                    for m in markets {
+                        let base_asset = m.get("base").and_then(|v| v.as_str()).unwrap_or("");
+                        let quote_asset = m.get("quote").and_then(|v| v.as_str()).unwrap_or("");
+                        if base_asset.is_empty() || quote_asset.is_empty() { continue; }
+                        let orderbook = OrderBook::new(
+                            base_asset.to_string(),
+                            quote_asset.to_string(),
+                            Vec::new(),
+                            Vec::new(),
+                            Some(0),    
+                            Some(0.0),  
+                        );
+                        println!("Initialized orderbook for {}-{}", base_asset, quote_asset);
+                        self.orderbooks.push(orderbook);
+                        initialized = true;
+                    }
+                }
+            }
+        }
 
-        for (base_asset, quote_asset) in supported_markets {
-            let orderbook = OrderBook::new(
-                base_asset.to_string(),
-                quote_asset.to_string(),
-                Vec::new(),
-                Vec::new(),
-                Some(0),    
-                Some(0.0),  
-            );
-            
-            println!("Initialized orderbook for {}-{}", base_asset, quote_asset);
-            self.orderbooks.push(orderbook);
+        if !initialized {
+            let fallback = vec![
+                ("BTC", "USDC"), ("ETH", "USDC"), ("SOL", "USDC"), ("BNB", "USDC"), ("DOGECOIN", "USDC"), ("SUI", "USDC"), ("HYPERLIQUID", "USDC"),
+            ];
+            for (base_asset, quote_asset) in fallback {
+                let orderbook = OrderBook::new(
+                    base_asset.to_string(),
+                    quote_asset.to_string(),
+                    Vec::new(),
+                    Vec::new(),
+                    Some(0),    
+                    Some(0.0),  
+                );
+                println!("Initialized orderbook for {}-{}", base_asset, quote_asset);
+                self.orderbooks.push(orderbook);
+            }
         }
     }
 

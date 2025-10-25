@@ -1,6 +1,5 @@
 cex-be/engine/try.txt
 exchange-proxy
-cex-fe
 cex-be/api/target
 # cex-be/try.txt
 cex-be/api/cargo.lock
@@ -11,3 +10,5 @@ cex-be/ws/target
 cex-be/db/target
 cex-be/target
 cex-be/Cargo.lock
+cex-be/api/.env
+cex-be/db/.env

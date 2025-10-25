@@ -49,5 +49,17 @@ impl RedisManager {
             "No message received"
         )))
     }
+
+    pub async fn cache_markets(&self, markets_json: &str) -> redis::RedisResult<()> {
+        let mut publisher = self.publisher.lock().await;
+        publisher.set::<_, _, ()>("markets:list", markets_json).await?;
+        Ok(())
+    }
+
+    pub async fn get_cached_markets(&self) -> redis::RedisResult<Option<String>> {
+        let mut publisher = self.publisher.lock().await;
+        let val: Option<String> = publisher.get("markets:list").await?;
+        Ok(val)
+    }
 }
 

@@ -1,0 +1,128 @@
+get markets - done
+
+create trade page improved UI
+
+improve it everyday understand the click to queue flow
+
+## CEX Backend API Documentation
+
+Base URL: `http://localhost:3000/api/v1`
+
+### Authentication
+
+- POST `/auth/register`
+  - Body:
+    - `username` string
+    - `email` string (valid email)
+    - `password` string (min 6 chars)
+  - Response:
+    - `{ message, token, user: { id, email, username } }`
+
+- POST `/auth/login`
+  - Body:
+    - `email` string
+    - `password` string
+  - Response:
+    - `{ message, token, user: { id, email, username } }`
+
+Auth header for protected endpoints:
+
+`Authorization: Bearer <JWT>`
+
+### Orders (protected)
+
+- POST `/order`
+  - Body:
+    - `market` string, format `BASE-QUOTE` (e.g., `BTC-USD`)
+    - `price` number
+    - `quantity` number
+    - `side` "buy" | "sell"
+  - Notes: market-specific validation; minimum order value = $1
+  - Response: `{ success, message, data: string }` (engine response JSON string)
+
+- DELETE `/order`
+  - Body:
+    - `order_id` string
+    - `market` string `BASE-QUOTE`
+  - Response: `{ success, message, data: string }`
+
+- GET `/order/open`
+  - Query:
+    - `market` string `BASE-QUOTE`
+  - Response: `{ success, message, market, data: string }`
+
+### Depth
+
+- GET `/depth`
+  - Query:
+    - `symbol` string `BASE-QUOTE`
+  - Response: `string` (engine depth payload as JSON string)
+
+### Trades
+
+- GET `/trades`
+  - Query (optional):
+    - `market` string `BASE-QUOTE`
+    - `limit` number (default 100, max 1000)
+  - Response:
+    - `{ trades: Trade[], total: number }`
+
+### Tickers
+
+- GET `/tickers`
+  - Query (optional):
+    - `market` string `BASE-QUOTE` (default `BTCUSDT`)
+  - Response:
+    - `{ market, last_price, price_change_24h, price_change_percent_24h, volume_24h, high_24h, low_24h, bid_price?, ask_price?, timestamp }`
+
+### Klines (Candles)
+
+- GET `/klines`
+  - Query:
+    - `market` string `BASE-QUOTE`
+    - `interval` one of `1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M`
+    - `startTime` i64 (unix seconds)
+    - `endTime` i64 (unix seconds)
+  - Notes: max 1000 candles per request
+  - Response:
+    - `{ success, market, interval, klines: KlineData[] }`
+    - `KlineData`:
+      - `{ open_time, close_time, open, high, low, close, volume, quote_volume, trades }`
+
+### WebSocket
+
+Server URL: `ws://localhost:8000`
+
+- Subscribe:
+  - Client → Server: `{ "method": "SUBSCRIBE", "params": ["depth@BTC-USD", "trade@BTC-USD"] }`
+- Unsubscribe:
+  - Client → Server: `{ "method": "UNSUBSCRIBE", "params": ["depth@BTC-USD"] }`
+- Server emits:
+  - `{ event: string, data: string }` (channel and JSON payload string)
+
+### Validation Summary
+
+- `market`: `BASE-QUOTE`, uppercase, 3–10 chars each
+- `price`, `quantity`: positive; market-specific min/max and precision rules apply
+- minimum order notional: `price * quantity >= 1.0`
+
+### Common Error Responses
+
+- `{ error: "Validation failed", details: { field: ["message", ...] } }`
+- `{ error: "Invalid market format. Expected format: BASE-QUOTE (e.g., BTC-USD)" }`
+- `{ error: "Failed to create order", details: "..." }`
+- `{ error: "Authentication required" }` (missing/invalid JWT)
+
+### Environment
+
+Copy `env.example` → `.env` and set:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `JWT_SECRET`
+
+### Startup Order
+
+1) TimescaleDB  2) Redis  3) Engine  4) API  5) WebSocket
+
+
