@@ -202,4 +202,4 @@ This is a developer-focused project. Contributions welcome!
 
 ## 📄 License
 
-[Your License Here]
+MIT
