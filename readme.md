@@ -168,7 +168,7 @@ CEX/
 > TODO: Add detailed setup instructions
 
 ## Performance/Latency
-> TODO: Add detailed performance latency of each endpoint
+> TODO: Add detailed performance and latency metrics for each endpoint.
 
 ## Technologies Used
 
