@@ -135,13 +135,13 @@ CREATE TABLE IF NOT EXISTS markets (
 
 -- Seed default enabled markets (idempotent)
 INSERT INTO markets (base_asset, quote_asset, symbol, enabled, price_precision, quantity_precision, min_price, max_price, min_order_size, max_order_size) VALUES
- ('BTC','USDC','BTC-USDC', TRUE, 2, 8, 0.01, 1000000, 0.001, 100.0),
- ('ETH','USDC','ETH-USDC', TRUE, 2, 6, 0.01, 100000, 0.01, 1000.0),
- ('SOL','USDC','SOL-USDC', TRUE, 4, 4, 0.0001, 1000, 0.1, 10000.0),
- ('BNB','USDC','BNB-USDC', TRUE, 2, 6, 0.01, 100000, 0.01, 1000.0),
- ('DOGECOIN','USDC','DOGECOIN-USDC', TRUE, 4, 4, 0.0001, 1000, 1.0, 1000000.0),
- ('SUI','USDC','SUI-USDC', TRUE, 4, 4, 0.0001, 1000, 0.1, 100000.0),
- ('HYPERLIQUID','USDC','HYPERLIQUID-USDC', TRUE, 4, 4, 0.0001, 1000, 0.1, 100000.0)
+ ('BTC','USD','BTC-USD', TRUE, 2, 8, 0.01, 1000000, 0.001, 100.0),
+ ('ETH','USD','ETH-USD', TRUE, 2, 6, 0.01, 100000, 0.01, 1000.0),
+ ('SOL','USD','SOL-USD', TRUE, 4, 4, 0.0001, 1000, 0.1, 10000.0),
+ ('BNB','USD','BNB-USD', TRUE, 2, 6, 0.01, 100000, 0.01, 1000.0),
+ ('DOGECOIN','USD','DOGECOIN-USD', TRUE, 4, 4, 0.0001, 1000, 1.0, 1000000.0),
+ ('SUI','USD','SUI-USD', TRUE, 4, 4, 0.0001, 1000, 0.1, 100000.0),
+ ('HYPERLIQUID','USD','HYPERLIQUID-USD', TRUE, 4, 4, 0.0001, 1000, 0.1, 100000.0)
 ON CONFLICT (symbol) DO UPDATE SET
   enabled = EXCLUDED.enabled,
   price_precision = EXCLUDED.price_precision,

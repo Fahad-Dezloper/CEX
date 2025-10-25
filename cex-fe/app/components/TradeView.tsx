@@ -15,8 +15,9 @@ export function TradeView({
     let klineData: KLine[] = [];
     try {
       klineData = await getKlines(market, "1h", Math.floor((new Date().getTime() - 1000 * 60 * 60 * 24 * 7) / 1000), Math.floor(new Date().getTime() / 1000)); 
-
-    } catch (e) { }
+    } catch (e) { 
+      console.log("Error fetching kline data", klineData);
+    }
 
     if (chartRef) {
       if (chartManagerRef.current) {
@@ -38,7 +39,6 @@ export function TradeView({
           color: "white",
         }
       );
-      //@ts-ignore
       chartManagerRef.current = chartManager;
     }
   };
