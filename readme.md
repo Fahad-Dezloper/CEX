@@ -1,8 +1,9 @@
 # CEX - Centralized Exchange on Solana
+> An open-source, self-hostable exchange — an alternative to Backpack.
 
 A high-performance centralized cryptocurrency exchange built on Solana with MPC (Multi-Party Computation) wallet management. This exchange provides real-time order matching, depth management, and trade execution with low latency and high throughput.
 
-## 🎯 Project Overview
+## Project Overview
 
 This is a professional-grade centralized exchange (CEX) that provides:
 - **Real-time order matching** using an in-memory matching engine
@@ -12,7 +13,7 @@ This is a professional-grade centralized exchange (CEX) that provides:
 - **TimescaleDB** for time-series data storage (trades, orders, klines)
 - **Multiple market support** with configurable precision and limits
 
-## 🏗️ Architecture
+## Architecture
 
 The exchange follows a microservices architecture with four main services:
 
@@ -35,14 +36,10 @@ The exchange follows a microservices architecture with four main services:
                                           └─────────────┘
 ```
 
-### Data Flow
-
-1. **User submits order** → API validates and queues to Engine
-2. **Engine processes** → Matches order, updates balances, creates fills
-3. **Real-time updates** → Engine publishes to Redis pub/sub → WS broadcasts to clients
-4. **Persistence** → Engine queues to DB processor → TimescaleDB stores trades/orders
-
 ## 📁 Project Structure
+
+<details>
+<summary> Click to expand </summary>
 
 ```
 CEX/
@@ -118,12 +115,12 @@ CEX/
 │
 └── README.md                        # This file
 ```
+</details>
 
-## 🔧 Services Overview
+## Services Overview
 
 ### 1. **API Server** (`cex-be/api/`)
 - **Purpose**: HTTP REST API for all client requests
-- **Port**: 3010
 - **Tech**: Rust (Poem web framework)
 - **Key Responsibilities**:
   - User authentication (JWT)
@@ -146,7 +143,6 @@ CEX/
 
 ### 3. **WebSocket Server** (`cex-be/ws/`)
 - **Purpose**: Real-time data streaming to clients
-- **Port**: 8000
 - **Tech**: Rust (tokio-tungstenite)
 - **Key Responsibilities**:
   - Manages WebSocket connections per user
@@ -160,80 +156,21 @@ CEX/
 - **Key Responsibilities**:
   - Consumes DB queue from Engine
   - Stores trades, orders, market data
-  - Provides OHLCV data for charts (klines)
+  - Provides OHLCV ( OPEN, HIGH, LOW, CLOSE, VOLUME ) data for charts (klines)
   - Used by API for historical queries
 
 ### 5. **Frontend** (`cex-fe/`)
 - **Purpose**: User-facing trading interface
 - **Tech**: Next.js 14, TypeScript, Tailwind CSS
-- **Features**:
-  - Trading view with order book, charts, trade history
-  - User authentication
-  - Real-time market data via WebSocket
-  - Responsive design
+- In Progress ⏳
 
-## 🔄 Message Flow Examples
+##  Setup Instructions
+> TODO: Add detailed setup instructions
 
-### Creating an Order
-```
-1. Client → POST /api/v1/order → API Server
-2. API validates order (price, quantity, market, user balance)
-3. API → LPUSH "messages" → Redis Queue
-4. Engine ← BRPOP "messages" ← Redis Queue
-5. Engine matches order against orderbook
-6. Engine → PUBLISH "trade@BTC-USD" → Redis Pub/Sub
-7. Engine → RPUSH "db_events" → Redis DB Queue
-8. WS ← Receives pub/sub message ← Redis
-9. WS → Broadcasts to all subscribed clients
-10. Client ← Receives trade update via WebSocket
-```
+## Performance/Latency
+> TODO: Add detailed performance latency of each endpoint
 
-### Getting Order Depth
-```
-1. Client → GET /api/v1/depth?market=BTC-USD → API
-2. API → LPUSH "messages" → Redis Queue
-3. Engine pops message, queries in-memory orderbook
-4. Engine → PUBLISH response to API's unique channel
-5. API receives response, returns to client
-```
-
-## 🗄️ Database Schema
-
-### Core Tables
-- **users**: User accounts with encrypted JWT tokens
-- **markets**: Supported trading pairs (e.g., BTC-USD) with precision/limits
-- **orders**: Historical and active orders
-- **trades**: Executed trades with fill details
-- **user_assets**: User balances per asset (base/quote balances)
-
-## 🔐 Security Features
-
-- **JWT Authentication**: All protected endpoints require valid JWT token
-- **Order Validation**: Price/quantity validation before processing
-- **Balance Checks**: Engine verifies sufficient funds before locking
-- **MPC Wallet Management**: (Planned) Secure multi-party computation for private keys
-- **Rate Limiting**: (Planned) Prevent abuse on public endpoints
-
-## 🚀 Setup Instructions
-
-<!-- TODO: Add detailed setup instructions -->
-- [ ] Install Rust toolchain
-- [ ] Install Node.js and npm
-- [ ] Set up TimescaleDB
-- [ ] Configure Redis instances
-- [ ] Set environment variables
-- [ ] Run database migrations
-- [ ] Start backend services
-- [ ] Start frontend development server
-
-## 📊 Performance Characteristics
-
-- **Latency**: Sub-millisecond order matching
-- **Throughput**: Handles thousands of orders per second
-- **Order Book**: In-memory for fast matching, updates published in real-time
-- **Persistence**: Async queue-based for non-blocking writes
-
-## 🛠️ Technologies Used
+## Technologies Used
 
 **Backend:**
 - Rust (async with Tokio)
@@ -250,7 +187,7 @@ CEX/
 - Recharts/TradingView (charts)
 - WebSocket (real-time updates)
 
-## 📝 Development Status
+## Development Status
 
 - ✅ Core matching engine implemented
 - ✅ REST API endpoints functional
@@ -258,7 +195,6 @@ CEX/
 - ✅ Frontend trading interface in progress
 - ⏳ MPC wallet integration (planned)
 - ⏳ Advanced order types (limit, stop-loss) (planned)
-- ⏳ Admin dashboard (planned)
 
 ## 🤝 Contributing
 
