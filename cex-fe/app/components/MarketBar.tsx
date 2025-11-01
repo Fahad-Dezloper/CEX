@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { Ticker as TickerType } from "../utils/types";
 import { getTicker } from "../utils/httpClient";
+import Image from "next/image";
+import { ChevronDown } from "lucide-react";
 
 export const MarketBar = ({market}: {market: string}) => {
     const [ticker, setTicker] = useState<TickerType | null>(null);
@@ -10,40 +12,79 @@ export const MarketBar = ({market}: {market: string}) => {
         getTicker(market).then(setTicker);
     }, [market])
 
-    return <div className="flex items-center p-2 flex-row relative w-full overflow-hidden border-b border-slate-800">
-            <div className="flex items-center justify-between flex-row no-scrollbar overflow-auto pr-4">
-                    <Ticker market={market} />
-                    <div className="flex items-center flex-row space-x-8 pl-4">
-                        <div className="flex h-full justify-center">
-                            <p className={`font-medium tabular-nums text-greenText text-md text-green-500`}>${ticker?.lastPrice}1000</p>
-                        </div>
-                        <div className="flex flex-col">
-                            <p className={`font-medium text-xs text-slate-400 text-sm`}>24H Change</p>
-                            <p className={` text-sm font-medium tabular-nums leading-5 text-sm text-greenText ${Number(ticker?.priceChange) > 0 ? "text-green-500" : "text-red-500"}`}>{Number(ticker?.priceChange) > 0 ? "+" : ""} {ticker?.priceChange} {Number(ticker?.priceChangePercent)?.toFixed(2)}%</p></div><div className="flex flex-col">
-                                <p className="font-medium text-xs text-slate-400 text-sm">24H High</p>
-                                <p className="text-sm font-medium tabular-nums leading-5 text-sm ">{ticker?.high}</p>
-                                </div>
-                                <div className="flex flex-col">
-                                    <p className="font-medium text-xs text-slate-400 text-sm">24H Low</p>
-                                    <p className="text-sm font-medium tabular-nums leading-5 text-sm ">{ticker?.low}</p>
-                                </div>
-                            <button type="button" className="font-medium transition-opacity hover:opacity-80 hover:cursor-pointer text-base text-left" data-rac="">
-                                <div className="flex flex-col">
-                                    <p className="font-medium text-xs text-slate-400 text-sm">24H Volume</p>
-                                    <p className="mt-1 text-sm font-medium tabular-nums leading-5 text-sm ">{ticker?.volume}
-                                </p>
+    return <div className="flex items-center p-4 rounded-lg  primary-bg ">
+            <div className="flex items-center gap-8 justify-between flex-row  whitespace-nowrap scroll-x pr-4">
+                    {/* <Ticker market={market} /> */}
+                    <div className="flex items-center w-fit px-2 py-3 text-white bg-zinc-600/20 rounded-lg hover:cursor-pointer hover:bg-zinc-600/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                            <div className="w-[28px] h-[28px] flex items-center justify-center rounded-none">
+                                <Image
+                                    alt="Base Asset Logo"
+                                    width={48}
+                                    height={48}
+                                    loading="lazy"
+                                    decoding="async"
+                                    src="/sol.webp"
+                                    className="rounded-full object-cover"
+                                />
                             </div>
-                        </button>
+                            <span className="text-white font-semibold  text-lg tracking-wide select-none" style={{ fontFamily: "inherit" }}>
+                                {market.replace("-", " / ").toUpperCase()}
+                            </span>
+
+                            <ChevronDown className="accent" />
+                        </div>
                     </div>
+                    <div className="flex gap-6  items-center justify-center h-full text-white">
+                        <div className="flex flex-col h-full justify-center ">
+                            <p className={`font-medium tabular-nums text-greenText text-xl green-text`}>${ticker?.lastPrice}1000</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base text-white`}>${ticker?.lastPrice}1000.02</p>
+                        </div>
+
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H Change</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base green-text`}>+582.8 +0.53%</p>
+                        </div>
+
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H High</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base `}>111,077.2</p>
+                        </div>
+
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H Low</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base `}>108,603.8</p>
+                        </div>
+
+                        {/* TODO: its clickable and changeble to btc - usd, usd - btc */}
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H Volume (USD)</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base `}>12,320,750.64</p>
+                        </div>
+
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>Lend APY (BTC / USD)</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base green-text`}>0.01% / 5.56% ⚡️</p>
+                        </div>
+
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>Borrow APY (BTC / USD)</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base red-text`}>0.22% / 4.31%</p>
+                        </div>
+
+                        <div className="flex flex-col h-full ">
+                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>Interest Countdown</p>
+                            <p className={`font-medium tabular-nums text-greenText text-base `}>00:30:36</p>
+                        </div>
+
+                    </div>
+                    
                 </div>
             </div>
 
 }
 
 function Ticker({market}: {market: string}) {
-    return <div className="flex items-center gap-2 py-2 px-4 text-white bg-zinc-600/20 rounded-lg hover:cursor-pointer hover:bg-zinc-600/30 transition-colors">
-            <img alt="Base Asset Logo" loading="lazy" decoding="async" data-nimg="1" className="z-10 rounded-full h-6 w-6 outline-baseBackgroundL1"  src="/sol.webp" />
-            <div className="text-white">{market.replace("-", " / ")}</div>
-        </div>
+    return 
 
 }

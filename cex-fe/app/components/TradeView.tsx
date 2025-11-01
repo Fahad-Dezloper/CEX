@@ -35,7 +35,7 @@ export function TradeView({
           })),
         ].sort((x, y) => (x.timestamp < y.timestamp ? -1 : 1)) || [],
         {
-          background: "#0e0f14",
+          background: "#0DAF6E",
           color: "white",
         }
       );
@@ -49,7 +49,7 @@ export function TradeView({
 
   return (
     <>
-      <div ref={chartRef} style={{ height: "520px", width: "100%", marginTop: 4 }}></div>
+      <div ref={chartRef} style={{ height: "100%", width: "100%"}}></div>
     </>
   );
 }

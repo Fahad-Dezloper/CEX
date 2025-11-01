@@ -14,7 +14,7 @@ export const Appbar = () => {
         "user here too", user?.user?.assets.find((asset) => asset.symbol === "USDC")?.amount?.toString()
     );
 
-    return <div className="text-white border-b border-slate-800 pt-4 pb-2 max-w-6xl mx-auto">
+    return <div className="text-white pt-4 pb-2 px-6 w-full">
         <div className="flex justify-between items-center">
             <div className="flex">
                 <div className={`text-xl flex flex-col justify-center cursor-pointer text-white`} onClick={() => router.push('/')}>

@@ -139,3 +139,51 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+body {
+  background-color: #0E0F14;
+}
+
+.primary-bg {
+  background-color: #14151B;
+}
+
+.green-text {
+  color: #0DAF6E;
+}
+
+.green-bg {
+  background-color: #0DAF6E;
+}
+
+.red-text {
+  color: #FD4C4D;
+}
+
+.red-bg {
+  background-color: #FD4C4D;
+}
+
+.light-red-text {
+  color: #CE484B;
+}
+
+.light-red-bg {
+  background-color: #CE484B;
+}
+
+.accent {
+  color: #75798a;
+}
+
+.accent-bg {
+  background-color: #75798a;
+}
+
+.scroll-x {
+  overflow-x: auto;
+}
+
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
