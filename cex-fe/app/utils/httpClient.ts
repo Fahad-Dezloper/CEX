@@ -5,9 +5,37 @@ const BASE_URL = "http://localhost:3010/api/v1";
 
 export async function getTicker(market: string): Promise<Ticker> {
     const tickers = await getTickers();
-    const ticker = tickers.find(t => t.symbol === market);
+    if (!Array.isArray(tickers)) {
+        // throw new Error('getTickers did not return an array');
+        return {
+            firstPrice: "",
+            high: "",
+            lastPrice: "",
+            low: "",
+            priceChange: "",
+            priceChangePercent: "",
+            quoteVolume: "",
+            symbol: market,
+            trades: "",
+            volume: ""
+        };
+    }
+    const ticker = tickers.find((t: Ticker) => t.symbol === market);
     if (!ticker) {
-        throw new Error(`No ticker found for ${market}`);
+        // throw new Error(`No ticker found for ${market}`);
+        console.log(`No ticker found for ${market}`);
+    return {
+        firstPrice: "",
+        high: "",
+        lastPrice: "",
+        low: "",
+        priceChange: "",
+        priceChangePercent: "",
+        quoteVolume: "",
+        symbol: market,
+        trades: "",
+        volume: ""
+    };
     }
     return ticker;
 }

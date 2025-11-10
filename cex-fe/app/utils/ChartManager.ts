@@ -7,7 +7,7 @@ import {
 } from "lightweight-charts";
 
 export class ChartManager {
-  private candleSeries: ISeriesApi<"Candlestick">;
+  private candleSeries: any;
   private lastUpdateTime: number = 0;
   private chart: any;
   private currentBar: {
@@ -58,14 +58,14 @@ export class ChartManager {
       },
     });
     this.chart = chart;
-    this.candleSeries = chart.addCandlestickSeries();
+    // this.candleSeries = chart.createSeries(SeriesType.Candlestick);
 
-    this.candleSeries.setData(
-      initialData.map((data) => ({
-        ...data,
-        time: (data.timestamp / 1000) as UTCTimestamp,
-      }))
-    );
+    // this.candleSeries.setData(
+    //   initialData.map((data) => ({
+    //     ...data,
+    //     time: (data.timestamp / 1000) as UTCTimestamp,
+    //   }))
+    // );
   }
   public update(updatedPrice: any) {
     if (!this.lastUpdateTime) {

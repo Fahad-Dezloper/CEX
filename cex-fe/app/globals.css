@@ -187,3 +187,7 @@ body {
 .scroll-x::-webkit-scrollbar {
   display: none;
 }
+
+.primary-gray {
+  color: #8991A0;
+}

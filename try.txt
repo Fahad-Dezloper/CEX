@@ -1,3 +1,8 @@
+iterm terminal
+osascript osa_iterm.scpt
+
+
+
 get markets - done
 
 create trade page improved UI

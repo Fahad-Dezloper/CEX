@@ -42,39 +42,39 @@ export const MarketBar = ({market}: {market: string}) => {
                         </div>
 
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H Change</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base green-text`}>+582.8 +0.53%</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>24H Change</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm green-text`}>+582.8 +0.53%</p>
                         </div>
 
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H High</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base `}>111,077.2</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>24H High</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm `}>111,077.2</p>
                         </div>
 
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H Low</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base `}>108,603.8</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>24H Low</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm `}>108,603.8</p>
                         </div>
 
                         {/* TODO: its clickable and changeble to btc - usd, usd - btc */}
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>24H Volume (USD)</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base `}>12,320,750.64</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>24H Volume (USD)</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm `}>12,320,750.64</p>
                         </div>
 
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>Lend APY (BTC / USD)</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base green-text`}>0.01% / 5.56% ⚡️</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>Lend APY (BTC / USD)</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm green-text`}>0.01% / 5.56% ⚡️</p>
                         </div>
 
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>Borrow APY (BTC / USD)</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base red-text`}>0.22% / 4.31%</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>Borrow APY (BTC / USD)</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm red-text`}>0.22% / 4.31%</p>
                         </div>
 
                         <div className="flex flex-col h-full ">
-                            <p className={`font-medium tabular-nums text-greenText text-sm accent`}>Interest Countdown</p>
-                            <p className={`font-medium tabular-nums text-greenText text-base `}>00:30:36</p>
+                            <p className={`font-medium tabular-nums text-greenText text-xs accent`}>Interest Countdown</p>
+                            <p className={`font-medium tabular-nums text-greenText text-sm `}>00:30:36</p>
                         </div>
 
                     </div>

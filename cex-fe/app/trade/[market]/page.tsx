@@ -1,6 +1,7 @@
 "use client";
 import { MarketBar } from "@/app/components/MarketBar";
 import { SwapUI } from "@/app/components/SwapUI";
+import TradeTable from "@/app/components/TradeTable";
 import { TradeView } from "@/app/components/TradeView";
 import { Depth } from "@/app/components/depth/Depth";
 import { useParams } from "next/navigation";
@@ -19,17 +20,21 @@ export default function Page() {
                      <Depth market={market as string} /> 
                  </div>
              </div>
+             <div className="w-full h-[30vh] p-4 primary-bg rounded-lg">
+                <TradeTable />
+             </div>
         </div>
         {/* <div className="w-px flex-col border-slate-800 border-l"></div> */}
         <div className="flex flex-col gap-2">
         <div className="primary-bg text-white p-4 h-fit rounded-lg">
-            <div className="flex flex-col w-[350px] h-fit">
+            <div className="flex flex-col w-[300px] h-fit">
                 <SwapUI market={market as string} />
             </div>
         </div>
-        <div className="w-full h-[30vh] bg-[#14151B] rounded-lg"></div>
         </div>
 
-        <div className="w-full h-[10vh] bg-red-300 absolute bottom-0"></div>
+        {/* <div className="w-full h-[10vh] bg-red-300 absolute bottom-0"></div> */}
     </div>
 }
+
+// work for 100% not 90%
