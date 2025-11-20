@@ -2,6 +2,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import react from "react";
+import { BalancesTable } from "./tables/BalancesTable";
 
 const TradeTable = () => {
   return (
@@ -20,38 +21,38 @@ const TradeTable = () => {
           >
             Positions
           </TabsTrigger>
-          <TabsTrigger
+          {/* <TabsTrigger
             value="Borrows"
             className="data-[state=active]:bg-[#1F2026] text-sm px-3 text-[#8991A0] data-[state=active]:text-white w-fit"
           >
             Borrows
-          </TabsTrigger>
+          </TabsTrigger> */}
           <TabsTrigger
-            value="Open Orders"
+            value="Open-Orders"
             className="data-[state=active]:bg-[#1F2026] text-sm px-3 text-[#8991A0] data-[state=active]:text-white w-fit"
           >
             Open Orders
           </TabsTrigger>
-          <TabsTrigger
+          {/* <TabsTrigger
             value="TWAP"
             className="data-[state=active]:bg-[#1F2026] text-sm px-3 text-[#8991A0] data-[state=active]:text-white w-fit"
           >
             TWAP
-          </TabsTrigger>
+          </TabsTrigger> */}
           <TabsTrigger
-            value="Fill History"
+            value="Fill-History"
             className="data-[state=active]:bg-[#1F2026] text-sm px-3 text-[#8991A0] data-[state=active]:text-white w-fit"
           >
             Fill History
           </TabsTrigger>
           <TabsTrigger
-            value="Order History"
+            value="Order-History"
             className="data-[state=active]:bg-[#1F2026] text-sm px-3 text-[#8991A0] data-[state=active]:text-white w-fit"
           >
             Order History
           </TabsTrigger>
           <TabsTrigger
-            value="Position History"
+            value="Position-History"
             className="data-[state=active]:bg-[#1F2026] text-sm px-3 text-[#8991A0] data-[state=active]:text-white w-fit"
           >
             Position History
@@ -78,7 +79,43 @@ const TradeTable = () => {
                 </div>
               </div>
 
+            <BalancesTable />
               
+            </div>
+          </TabsContent>
+
+          <TabsContent value="Positions" className="w-full h-full">
+            <div className="h-[30vh] flex flex-col items-center justify-center gap-6 bg-[#191A21] w-full rounded-2xl">
+              <h1 className="text-white text-xl">No open positions</h1>
+              <p className="text-[#8991A0]">Open a position on a futures market and it will show up here.</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="Open-Orders" className="w-full h-full">
+            <div className="h-[30vh] flex flex-col items-center justify-center gap-6 bg-[#191A21] w-full rounded-2xl">
+              <h1 className="text-white text-xl">No open orders</h1>
+              <p className="text-[#8991A0]">Place limit orders for them to show up here.</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="Fill-History" className="w-full h-full">
+            <div className="h-[30vh] flex flex-col items-center justify-center gap-6 bg-[#191A21] w-full rounded-2xl">
+              <h1 className="text-white text-xl">No fill history</h1>
+              <p className="text-[#8991A0]">Once your orders have been filled on a market they will show up here.</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="Order-History" className="w-full h-full">
+            <div className="h-[30vh] flex flex-col items-center justify-center gap-6 bg-[#191A21] w-full rounded-2xl">
+              <h1 className="text-white text-xl">No order history</h1>
+              <p className="text-[#8991A0]">Trade, place orders, and manage your funds for activity to appear here.</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="Position-History" className="w-full h-full">
+            <div className="h-[30vh] flex flex-col items-center justify-center gap-6 bg-[#191A21] w-full rounded-2xl">
+              <h1 className="text-white text-xl">No position history</h1>
+              <p className="text-[#8991A0]">Position history will show up here.</p>
             </div>
           </TabsContent>
         </div>

@@ -20,7 +20,7 @@ export default function Page() {
                      <Depth market={market as string} /> 
                  </div>
              </div>
-             <div className="w-full h-[30vh] p-4 primary-bg rounded-lg">
+             <div className="w-full h-fit p-4 primary-bg rounded-lg">
                 <TradeTable />
              </div>
         </div>
