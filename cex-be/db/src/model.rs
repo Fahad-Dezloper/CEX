@@ -1,12 +1,17 @@
 use bigdecimal::BigDecimal;
 use chrono::{NaiveDate, NaiveDateTime};
-use diesel::prelude::{Queryable, Insertable};
+use diesel::prelude::{Associations, Identifiable, Insertable, Queryable};
+use diesel::sql_types::Jsonb;
+use diesel::deserialize::FromSql;
+use diesel::serialize::{IsNull, Output, ToSql};
+use diesel::pg::Pg;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::schema::{trades, orders, users};
+use crate::schema::{trades, orders, users, markets, user_assets};
 
-#[derive(Debug, Queryable, Insertable, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Insertable, Serialize, Deserialize, Identifiable)]
 #[diesel(table_name = users)]
+#[diesel(primary_key(id))]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -38,5 +43,32 @@ pub struct Order {
     pub quantity: String,
     pub side: String,
     pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Queryable, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = markets)]
+pub struct Market {
+    pub id: Uuid,
+    pub base_asset: String,
+    pub quote_asset: String,
+    pub symbol: String,
+    pub enabled: bool,
+    pub price_precision: i32,
+    pub quantity_precision: i32,
+    pub min_price: f64,
+    pub max_price: f64,
+    pub min_order_size: f64,
+    pub max_order_size: f64,
+}
+
+#[derive(Debug, Queryable, Insertable, Serialize, Deserialize, Associations, Identifiable, Clone)]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(table_name = user_assets)]
+#[diesel(primary_key(id))]
+pub struct UserAsset {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub symbol: String,
+    pub amount: f64,
 }
 

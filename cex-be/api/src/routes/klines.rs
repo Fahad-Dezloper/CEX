@@ -28,6 +28,7 @@ async fn get_klines(
     Data(_manager): Data<&Arc<RedisManager>>,
     Query(query): Query<KlinesQuery>
 ) -> Result<Json<serde_json::Value>> {
+    println!("kline data requested");
     info!("Getting klines for market: {}, interval: {}", query.market, query.interval);
     let valid_intervals = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"];
     if !valid_intervals.contains(&query.interval.as_str()) {
@@ -48,7 +49,10 @@ async fn get_klines(
     }
 
     let interval_minutes = get_interval_minutes(&query.interval);
-    let max_duration_seconds = interval_minutes * 60 * 1000; // Convert to seconds
+    // Calculate maximum allowed duration in milliseconds for this interval
+    // Example: 1h interval = 60 minutes * 60 seconds * 1000 ms = 3,600,000 ms
+    // Example: 1d interval = 1440 minutes * 60 seconds * 1000 ms = 86,400,000 ms
+    let max_duration_seconds = interval_minutes * 60 * 1000; 
     if (end_time - start_time) > max_duration_seconds {
         warn!("Time range too large for interval: {}", query.interval);
         return Ok(Json(json!({
@@ -100,6 +104,7 @@ async fn fetch_klines_from_db(
         return Ok(vec![]);
     }
 
+    // format into kline format
     let klines = generate_klines_from_trades(trades_data, interval, start_dt, end_dt);
     
     Ok(klines)
@@ -111,8 +116,8 @@ fn generate_klines_from_trades(
     start_dt: NaiveDateTime,
     end_dt: NaiveDateTime,
 ) -> Vec<KlineData> {
-    let interval_minutes = get_interval_minutes(interval);
-    let mut klines = Vec::new();
+    let interval_minutes = get_interval_minutes(interval); // 1h -> 60 minutes
+    let mut klines = Vec::new(); // kline []
     
     let mut current_time = start_dt;
     let mut current_kline: Option<KlineData> = None;
@@ -121,13 +126,20 @@ fn generate_klines_from_trades(
         let price = price_str.parse::<f64>().unwrap_or(0.0);
         let quantity = quantity_str.parse::<f64>().unwrap_or(0.0);
 
+        // Calculate which kline interval this trade belongs to
+        // Example: trade at 14:23:45 with 1h interval -> kline_start = 14:00:00
+        // Example: trade at 14:23:45 with 5m interval -> kline_start = 14:20:00
         let kline_start = get_kline_start_time(timestamp, interval_minutes);
         
+        // Check if we need to start a new kline (first trade or different time interval)
         if current_kline.is_none() || current_kline.as_ref().unwrap().open_time != kline_start.timestamp() {
+            // Save the previous kline if it exists
             if let Some(kline) = current_kline.take() {
                 klines.push(kline);
             }
             
+            // Create new kline with this trade's data
+            // Example: price=100.5, quantity=2.0 -> open=100.5, high=100.5, low=100.5, close=100.5, volume=2.0, quote_volume=201.0
             current_kline = Some(KlineData {
                 open_time: kline_start.timestamp(),
                 close_time: (kline_start + Duration::minutes(interval_minutes)).timestamp(),
@@ -140,6 +152,10 @@ fn generate_klines_from_trades(
                 trades: 1,
             });
         } else {
+            // Update existing kline with new trade data
+            // Example: existing high=100.5, new price=101.0 -> high becomes 101.0
+            // Example: existing low=100.5, new price=100.0 -> low becomes 100.0
+            // Example: existing volume=2.0, new quantity=1.5 -> volume becomes 3.5
             if let Some(ref mut kline) = current_kline {
                 kline.high = kline.high.max(price);
                 kline.low = kline.low.min(price);
@@ -174,7 +190,7 @@ fn get_interval_minutes(interval: &str) -> i64 {
         "1d" => 1440,
         "3d" => 4320,
         "1w" => 10080,
-        "1M" => 43800, // Approximate month
+        "1M" => 43800,
         _ => 1,
     }
 }
@@ -186,7 +202,6 @@ fn get_kline_start_time(timestamp: NaiveDateTime, interval_minutes: i64) -> Naiv
 }
 
 fn time_to_naive_datetime(timestamp: i64) -> NaiveDateTime {
-    // Convert Unix timestamp to NaiveDateTime
     NaiveDateTime::from_timestamp_opt(timestamp, 0)
         .unwrap_or_else(|| chrono::Utc::now().naive_utc())
 }

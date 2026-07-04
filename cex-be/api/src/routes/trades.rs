@@ -1,3 +1,4 @@
+use log::info;
 use poem::{get, handler, web::{Json, Query}, Route, Result, error::InternalServerError};
 use serde::{Serialize, Deserialize};
 use db::{establish_connection, Trade, trades};
@@ -19,30 +20,27 @@ pub struct TradesResponse {
 
 #[handler]
 async fn get_trades(Query(params): Query<TradesParams>) -> Result<Json<TradesResponse>> {
-    // Establish database connection
     let pool = establish_connection();
     let mut conn = pool.get()
         .map_err(|e| InternalServerError(e))?;
 
-    // Build query
     let mut query = trades::table.into_boxed();
     
-    // Filter by market if provided
     if let Some(market) = &params.market {
         query = query.filter(trades::market.eq(market));
     }
     
-    // Order by timestamp descending (most recent first)
     query = query.order(trades::timestamp.desc());
     
-    // Apply limit (default to 100 if not specified)
-    let limit = params.limit.unwrap_or(100).min(1000); // Cap at 1000
+    let limit = params.limit.unwrap_or(100).min(1000);
     query = query.limit(limit);
 
-    // Execute query
     let trades_result = query
         .load::<Trade>(&mut conn)
         .map_err(|e| InternalServerError(e))?;
+
+    info!("Retrieved {} trades", trades_result.len());
+    info!("Trades: {:?}", trades_result);
 
     Ok(Json(TradesResponse {
         total: trades_result.len(),

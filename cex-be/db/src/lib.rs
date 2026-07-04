@@ -58,6 +58,17 @@ pub fn establish_connection() -> DbPool {
     }
 }
 
+use diesel::prelude::*;
+use crate::schema::markets::dsl as markets_dsl;
+
+pub fn fetch_enabled_markets(pool: &DbPool) -> Result<Vec<Market>, diesel::result::Error> {
+    let mut conn = pool.get().expect("Failed to get DB connection");
+    let results: Vec<Market> = markets_dsl::markets
+        .filter(markets_dsl::enabled.eq(true))
+        .load::<Market>(&mut conn)?;
+    Ok(results)
+}
+
 fn process_message(message: DbMessage, pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = pool.get()?;
     

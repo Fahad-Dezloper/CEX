@@ -1,6 +1,25 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    markets (id) {
+        id -> Uuid,
+        #[max_length = 16]
+        base_asset -> Varchar,
+        #[max_length = 16]
+        quote_asset -> Varchar,
+        #[max_length = 64]
+        symbol -> Varchar,
+        enabled -> Bool,
+        price_precision -> Int4,
+        quantity_precision -> Int4,
+        min_price -> Float8,
+        max_price -> Float8,
+        min_order_size -> Float8,
+        max_order_size -> Float8,
+    }
+}
+
+diesel::table! {
     orders (id, created_at) {
         id -> Uuid,
         executed_qty -> Numeric,
@@ -33,6 +52,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    user_assets (id) {
+        id -> Uuid,
+        user_id -> Uuid,
+        #[max_length = 64]
+        symbol -> Varchar,
+        amount -> Float8,
+    }
+}
+
+diesel::table! {
     users (id) {
         id -> Uuid,
         #[max_length = 255]
@@ -46,4 +75,6 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(orders, trades, users,);
+diesel::joinable!(user_assets -> users (user_id));
+
+diesel::allow_tables_to_appear_in_same_query!(markets, orders, trades, user_assets, users,);
